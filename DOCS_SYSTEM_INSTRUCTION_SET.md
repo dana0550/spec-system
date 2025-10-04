@@ -358,6 +358,17 @@ doc_type: glossary
 > "Run glossary lint. Reject inconsistent terminology and suggest fixes based on GLOSSARY.md."
 
 ### 6.12 Generate Release Readiness
+### 6.13 Upgrade Docs System
+> "Upgrade the Docs System to the latest instruction set.
+> - Apply all template and marker changes repo-wide.
+> - Migrate existing feature specs to include new sections and AUTOGEN blocks (Development Status, Budgets, Security & Privacy, Contracts & Schemas, Impacted Artifacts).
+> - Update workflows, propagation rules, and integrity checks in line with the latest instruction set.
+> - Backfill missing AUTOGEN blocks without overwriting existing content.
+> - Create or refresh supporting scaffolds: PR template, contracts/, context_packs/.
+> - Run all integrity checks; rebuild maps/backlinks/impact maps.
+> - Produce MIGRATION_REPORT.md summarizing changes, gaps, and readiness.
+> - Output a docs commit message summarizing impacted files."
+
 > "Generate RELEASE_READINESS.md by scanning all features/*.md. Summarize per feature: Status, Phase, %R complete, %AC complete, Budgets, Security, Flags/Kill-switches, Open Questions."
 
 ### 6.8 Update Development Status
