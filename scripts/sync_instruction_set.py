@@ -3,7 +3,9 @@
 
 The script compares semantic versions stored in the frontmatter of
 `DOCS_SYSTEM_INSTRUCTION_SET.md` before copying so downstream repositories can
-decide whether an upgrade is required.
+decide whether an upgrade is required. When the destination is missing the file
+or lacks version metadata, the script automatically treats it as outdated and
+copies the latest instruction set.
 """
 
 from __future__ import annotations
@@ -151,25 +153,30 @@ def sync_instruction_set(
     source_version = read_frontmatter_version(source_path)
     dest_version = None
 
+    dest_note = ""
     if target_path.exists():
-        dest_version = read_frontmatter_version(target_path)
-        comparison = source_version.compare(dest_version)
-        if comparison < 0 and not force:
-            raise SyncError(
-                "Destination instruction set is newer. Use --force to overwrite."
-            )
-        if comparison == 0 and not force:
-            log(
-                "Destination already has the same version; nothing to do. "
-                "Use --force to overwrite anyway.",
-                quiet=quiet,
-            )
-            return
+        try:
+            dest_version = read_frontmatter_version(target_path)
+        except SyncError:
+            dest_note = " (destination missing version metadata; replacing with latest)"
+        else:
+            comparison = source_version.compare(dest_version)
+            if comparison < 0 and not force:
+                raise SyncError(
+                    "Destination instruction set is newer. Use --force to overwrite."
+                )
+            if comparison == 0 and not force:
+                log(
+                    "Destination already has the same version; nothing to do. "
+                    "Use --force to overwrite anyway.",
+                    quiet=quiet,
+                )
+                return
+            dest_note = f" (replacing {dest_version})"
 
     action = "Would copy" if dry_run else "Copying"
     log(
-        f"{action} instruction set {source_version} -> {target_path}"
-        + (f" (replacing {dest_version})" if dest_version else ""),
+        f"{action} instruction set {source_version} -> {target_path}{dest_note}",
         quiet=quiet,
     )
 

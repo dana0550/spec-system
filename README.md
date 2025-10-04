@@ -154,9 +154,22 @@ Deprecate feature F-004
 ## 🔄 Staying Up to Date
 
 - **Instruction set versioning.** `DOCS_SYSTEM_INSTRUCTION_SET.md` now carries semantic version metadata (`MAJOR.MINOR.PATCH`) and release notes so you can see at a glance when an upgrade is available.  
-- **Sync script.** Run `python scripts/sync_instruction_set.py <destination>` (where `<destination>` is the root of the repo you want to update). Use `--dry-run` to preview, `--force` to downgrade, and `--target` to override the default `docs/DOCS_SYSTEM_INSTRUCTION_SET.md` path. Example: `python scripts/sync_instruction_set.py ../product-repo --dry-run`.  
 - **Codex upgrade task.** After syncing the instruction set into a working repo, run the Codex workflow `Upgrade Docs System` (Section 6.13 of the instruction set) to regenerate specs, templates, backlinks, and integrity checks with the new guidance.  
 - **Changelog discipline.** Record the instruction-set upgrade in the destination repo’s changelog or ADR for traceability.  
+
+---
+
+## 🧩 Syncing the Instruction Set
+
+1. **Choose the destination.** Set `<destination>` to the root folder of the repo you want to update (e.g., `../product-repo`).  
+2. **Dry-run first.** Preview the action:  
+   `python scripts/sync_instruction_set.py <destination> --dry-run`  
+3. **Apply the update.** Copy the instruction set when ready:  
+   `python scripts/sync_instruction_set.py <destination>`  
+4. **Handle edge cases.** Add `--target <relative/path.md>` to place the file somewhere other than `docs/DOCS_SYSTEM_INSTRUCTION_SET.md`; add `--force` if you intentionally need to overwrite a newer version.  
+5. **Follow-up.** Run the `Upgrade Docs System` Codex workflow in the destination repo to regenerate maps, backlinks, and checklists.  
+
+> The script copies the latest instruction set when the destination is missing the file or carries an older/non-versioned copy.
 
 ---
 
