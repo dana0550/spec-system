@@ -163,7 +163,8 @@ Deprecate feature F-004
 ## 🔄 Staying Up to Date
 
 - **Instruction set versioning.** `DOCS_SYSTEM_INSTRUCTION_SET.md` now carries semantic version metadata (`MAJOR.MINOR.PATCH`) and release notes so you can see at a glance when an upgrade is available.  
-- **Codex upgrade task.** After syncing the instruction set into a working repo, run the Codex workflow `Upgrade Docs System` (Section 6.13 of the instruction set) to regenerate specs, templates, backlinks, and integrity checks with the new guidance.  
+- **Codex upgrade task.** After syncing the instruction set into a working repo, run the Codex workflow `Upgrade Docs System` (Section 6.13 of the instruction set) to regenerate specs, templates, backlinks, and integrity checks with the new guidance. Use a prompt like:
+  `Upgrade Docs System to instruction set v1.1.0; confirm integrity checks pass.`
 - **Changelog discipline.** Record the instruction-set upgrade in the destination repo’s changelog or ADR for traceability.  
 
 ---
@@ -176,7 +177,8 @@ Deprecate feature F-004
 3. **Apply the update.** Copy the instruction set when ready:  
    `python scripts/sync_instruction_set.py <destination>`  
 4. **Handle edge cases.** Use optional flags when you need different behavior (see flag reference below).  
-5. **Follow-up.** Run the `Upgrade Docs System` Codex workflow in the destination repo to regenerate maps, backlinks, and checklists.  
+5. **Follow-up.** Run the `Upgrade Docs System` Codex workflow in the destination repo to regenerate maps, backlinks, and checklists (for example:
+   `Upgrade Docs System to instruction set v1.1.0; confirm integrity checks pass.`).  
 
 **Flag reference**  
 - `--dry-run` prints the planned copy action without writing files; safe for validation.  
