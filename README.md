@@ -33,30 +33,121 @@ The system is **LLM-friendly**, using machine markers (`<!-- AUTOGEN:... -->`) s
 
 ## 🛠 How to Use
 
-### Bootstrap the system
-```
-Ask Codex: "Bootstrap the spec system."
-```
-This will create the folder structure, templates, and initial docs.
+This system works by giving **Codex-style instructions** that trigger updates across the entire documentation set. Below are common scenarios with clear step-by-step instructions:
 
-### Add a new feature
+### 1. Bootstrapping the System
+**Scenario:** Starting a new repository from scratch.  
+**Instruction to Codex:**
+```
+Bootstrap the spec system
+```
+**What happens:**
+- Creates the full `docs/` folder structure.  
+- Generates templates and example files.  
+- Initializes `MASTER_SPEC.md`, `FEATURES.md`, `PRODUCT_MAP.md`.  
+
+---
+
+### 2. Adding a New Feature
+**Scenario:** You want to add a feature called *Clipboard Actions*.  
+**Instruction to Codex:**
 ```
 Add a new feature "Clipboard Actions" as active
 ```
-Codex will:
-- Assign the next feature ID.  
-- Update `FEATURES.md`.  
-- Create a feature spec file from the template.  
-- Rebuild the product map & backlinks.  
-- Append to the changelog.  
+**What happens:**
+- Assigns the next available feature ID (e.g., F-007).  
+- Updates `FEATURES.md`.  
+- Creates a feature spec file from the template.  
+- Rebuilds `PRODUCT_MAP.md` and backlinks.  
+- Appends an entry to the feature’s changelog.  
 
-### Update development status
+---
+
+### 3. Adding a Sub-Feature
+**Scenario:** You want to add a sub-feature under F-001 (Voice Capture).  
+**Instruction to Codex:**
+```
+Under F-001, add sub-spec "Hotword Start" as proposed
+```
+**What happens:**
+- Creates a new ID (e.g., F-001.02).  
+- Adds the sub-spec file with its own template.  
+- Updates the parent’s *Children* section.  
+- Rebuilds `PRODUCT_MAP.md`.  
+
+---
+
+### 4. Updating a Feature (Clarifications/Changes)
+**Scenario:** You need to add a new requirement and acceptance criteria.  
+**Instruction to Codex:**
 ```
 Update feature "F-003":
-- Mark R1 complete, linked to PR #123
-- Mark AC1 complete, linked to Test T-045
+- Add requirement R3: "Support offline caching"
+- Add acceptance criterion AC3: "Given airplane mode, then dictation persists offline"
 ```
-Codex will refresh checklists, update traceability, and append to the changelog.
+**What happens:**
+- Updates the feature spec.  
+- Refreshes development checklists automatically.  
+- Appends an entry to the Changelog.  
+
+---
+
+### 5. Tracking Development Status
+**Scenario:** Marking progress against requirements and linking to implementation work.  
+**Instruction to Codex:**
+```
+Update feature "F-003":
+- Mark R1 complete, linked to PR #123 and Test T-045
+- Mark AC1 complete, linked to ENG-321
+```
+**What happens:**
+- Updates checkboxes in the Development Status section.  
+- Refreshes the traceability table with PRs, tests, tickets.  
+- Appends a dated changelog entry.  
+
+---
+
+### 6. Recording a Decision (ADR)
+**Scenario:** You decide to use SQLite for offline caching.  
+**Instruction to Codex:**
+```
+Create ADR "Use SQLite for offline cache":
+- Context: Need lightweight storage
+- Decision: Adopt SQLite
+- Consequences: Simplifies persistence, adds dependency
+- Alternatives: Flat files, Postgres
+Link ADR to feature F-003
+```
+**What happens:**
+- Creates `DECISIONS/ADR-xxxx.md`.  
+- Links ADR in the relevant feature spec.  
+- Ensures backlinks are updated.  
+
+---
+
+### 7. Renaming a Feature Safely
+**Scenario:** You want to rename "Formatting Engine" to "Text Formatter".  
+**Instruction to Codex:**
+```
+Rename F-002 to "Text Formatter"
+```
+**What happens:**
+- Updates the name in `FEATURES.md` (adds old name to Aliases).  
+- Renames the feature spec file.  
+- Rebuilds maps and backlinks.  
+
+---
+
+### 8. Deprecating a Feature
+**Scenario:** Retiring a feature no longer in scope.  
+**Instruction to Codex:**
+```
+Deprecate feature F-004
+```
+**What happens:**
+- Marks the feature as `deprecated` in `FEATURES.md`.  
+- Adds a banner to the spec file.  
+- Removes it from active product map sections.  
 
 ---
 
@@ -80,6 +171,7 @@ docs/
 - Never manually edit `AUTOGEN` sections.  
 - Use ADRs for architectural or design decisions.  
 - Keep changelogs concise but meaningful.  
+- Treat `status:` in `FEATURES.md` as canonical truth for lifecycle.  
 
 ---
 
