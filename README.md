@@ -163,8 +163,7 @@ Deprecate feature F-004
 ## 🔄 Staying Up to Date
 
 - **Instruction set versioning.** `DOCS_SYSTEM_INSTRUCTION_SET.md` now carries semantic version metadata (`MAJOR.MINOR.PATCH`) and release notes so you can see at a glance when an upgrade is available.  
-- **Codex upgrade task.** After syncing the instruction set into a working repo, run the Codex workflow `Upgrade Docs System` (Section 6.13 of the instruction set) to regenerate specs, templates, backlinks, and integrity checks with the new guidance. Use a prompt like:
-  `Upgrade Docs System to instruction set v1.1.0; confirm integrity checks pass.`
+- **Codex upgrade task.** After syncing, follow the Post-Sync Upgrade Workflow (below) to run the `Upgrade Docs System` prompt so templates, backlinks, and integrity checks match the new instruction set.
 - **Changelog discipline.** Record the instruction-set upgrade in the destination repo’s changelog or ADR for traceability.  
 
 ---
@@ -177,8 +176,7 @@ Deprecate feature F-004
 3. **Apply the update.** Copy the instruction set when ready:  
    `python scripts/sync_instruction_set.py <destination>`  
 4. **Handle edge cases.** Use optional flags when you need different behavior (see flag reference below).  
-5. **Follow-up.** Run the `Upgrade Docs System` Codex workflow in the destination repo to regenerate maps, backlinks, and checklists (for example:
-   `Upgrade Docs System to instruction set v1.1.0; confirm integrity checks pass.`).  
+5. **Follow-up.** Move to the Post-Sync Upgrade Workflow section and execute the listed steps to finish the migration.  
 
 **Flag reference**  
 - `--dry-run` prints the planned copy action without writing files; safe for validation.  
@@ -187,6 +185,19 @@ Deprecate feature F-004
 - `--quiet` suppresses non-error output for scripting.  
 
 > The script copies the latest instruction set when the destination is missing the file or carries an older/non-versioned copy.
+
+---
+
+## ⚙️ Post-Sync Upgrade Workflow
+
+1. **Enter the destination repo.** Open a Codex session rooted in the project that just received the updated instruction set.
+2. **Run the upgrade prompt.** Ask Codex:  
+   `Upgrade Docs System to instruction set v1.1.0; confirm integrity checks pass.`  
+   (Update the version string when newer releases arrive.)
+3. **Let Codex migrate assets.** The workflow applies template changes, refreshes feature specs, rebuilds `FEATURES.md`/`PRODUCT_MAP.md`, updates backlinks, and regenerates checklists plus `MIGRATION_REPORT.md`.
+4. **Review and finalize.** Inspect the migration report and diffs, run any tests you require, then capture the changes in a commit/PR.
+
+> Codex only performs these upgrades when you explicitly request them; syncing the file alone does not update the rest of the documentation.
 
 ---
 
