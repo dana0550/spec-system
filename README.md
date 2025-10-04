@@ -151,6 +151,15 @@ Deprecate feature F-004
 
 ---
 
+## 🔄 Staying Up to Date
+
+- **Instruction set versioning.** `DOCS_SYSTEM_INSTRUCTION_SET.md` now carries semantic version metadata (`MAJOR.MINOR.PATCH`) and release notes so you can see at a glance when an upgrade is available.  
+- **Sync script.** Run `python scripts/sync_instruction_set.py <destination>` (where `<destination>` is the root of the repo you want to update). Use `--dry-run` to preview, `--force` to downgrade, and `--target` to override the default `docs/DOCS_SYSTEM_INSTRUCTION_SET.md` path. Example: `python scripts/sync_instruction_set.py ../product-repo --dry-run`.  
+- **Codex upgrade task.** After syncing the instruction set into a working repo, run the Codex workflow `Upgrade Docs System` (Section 6.13 of the instruction set) to regenerate specs, templates, backlinks, and integrity checks with the new guidance.  
+- **Changelog discipline.** Record the instruction-set upgrade in the destination repo’s changelog or ADR for traceability.  
+
+---
+
 ## 📂 Folder Structure
 ```
 docs/
@@ -172,6 +181,7 @@ docs/
 - Use ADRs for architectural or design decisions.  
 - Keep changelogs concise but meaningful.  
 - Treat `status:` in `FEATURES.md` as canonical truth for lifecycle.  
+- Note the instruction-set version and rerun `Upgrade Docs System` after pulling updates.  
 
 ---
 

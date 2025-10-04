@@ -1,9 +1,12 @@
 ---
 doc_type: guide
 name: docs_system_instruction_set
-last_updated: 2025-03-28
+version: 1.1.0
+last_updated: 2025-10-04
 ---
 Here’s a complete, copy-pasteable **instruction set for OpenAI Codex** to create and maintain a Markdown-only spec system where changes propagate cleanly across a master spec, feature specs, and sub-specs.
+
+> Instruction set version **1.1.0** published 2025-10-04. Use the sync script in this repo to upgrade downstream copies only when the version increases.
 
 ---
 
@@ -510,6 +513,25 @@ docs: deprecate F-004; replace with F-009; refresh backlinks
 ---
 
 ### How to use this
-1) Paste Sections **1–10** into your repo under `docs/`, or ask Codex to bootstrap it using **6.1**.  
+1) Paste Sections **1–11** into your repo under `docs/`, or ask Codex to bootstrap it using **6.1**.  
 2) From now on, give Codex tasks using the verbs in **6.2–6.7**.  
 3) Always start with the index (`FEATURES.md`) so propagation is deterministic.
+
+---
+
+## 11) Versioning & distribution
+
+- **Semantic versioning.** The `version` in this file’s frontmatter follows `MAJOR.MINOR.PATCH`.
+  - Increment **MAJOR** for incompatible structure changes that require manual migration.
+  - Increment **MINOR** for additive, backward-compatible guidance.
+  - Increment **PATCH** for typo fixes or clarifications.
+- **Upgrade policy.** When downstream repos hold an older copy, upgrade only after reviewing release notes below and running the sync script.
+- **Release notes.** Keep the list below up to date so integrators understand changes before syncing.
+- **Sync script.** Run `python scripts/sync_instruction_set.py <dest-repo>` (see script help for options). The script:
+  - compares the local `version` to the destination file’s version (if present),
+  - prompts on downgrades,
+  - copies `DOCS_SYSTEM_INSTRUCTION_SET.md` into `<dest>/docs/DOCS_SYSTEM_INSTRUCTION_SET.md` by default, or a custom path via `--target`.
+- **Audit trail.** Record upgrades in the destination repo’s changelog/ADR so teams know when the instruction set changed.
+
+### Release notes
+- **1.1.0 (2025-10-04):** Added semantic versioning metadata, release notes, and automation guidance for syncing instruction sets across repositories.
