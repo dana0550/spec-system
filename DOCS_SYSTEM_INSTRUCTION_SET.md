@@ -1,8 +1,8 @@
 ---
 doc_type: guide
 name: docs_system_instruction_set
-version: 1.1.0
-last_updated: 2025-10-04
+version: 1.2.0
+last_updated: 2025-10-05
 ---
 Here’s a complete, copy-pasteable **instruction set for OpenAI Codex** to create and maintain a Markdown-only spec system where changes propagate cleanly across a master spec, feature specs, and sub-specs.
 
@@ -354,8 +354,21 @@ doc_type: glossary
 > "Create context_packs/CP-<id>.md for <Feature/Task> with ≤20 files/snippets (specs, code, tests, contracts) ranked by relevance. 
 > Use this pack as the only working set for subsequent edits; expire after 7 days."
 
-### 6.10 Open PR for <Feature>
-> "Open PR for <Feature>. Ensure PR includes references to feature IDs, updates spec/IMPACT_MAP, updates tests, meets budgets, and addresses security checklist."
+### 6.10 Open PR for <Feature Set>
+> "Open a documentation PR for **[F-IDs]** using the docs template.
+> - Run all integrity checks first (map rebuild, backlinks, checklists, `MIGRATION_REPORT.md` if present).
+> - Collect impacted feature IDs/names, spec paths, ADR updates, tests, budgets, and security notes from the latest diffs and migration artifacts.
+> - Render `.github/PULL_REQUEST_TEMPLATE.md`, replacing every guidance comment with concrete data:
+>   - Fill **Summary** with 2–3 bullets describing the change and why it matters.
+>   - Populate the **Feature Coverage** table for all touched features (new/updated/deprecated) and note whether the spec file changed.
+>   - List new/updated/superseded ADRs with IDs.
+>   - Tick the integrity checklist items that were satisfied during this run.
+>   - Document verification (tests, lint, manual QA) and any release/budget/security follow-ups.
+> - Use the template when opening the PR:
+>   `gh pr create --title "docs: <summary> [F-IDs]" --template docs-system`
+>   (omit `--template` if the template is the default file)."
+
+> "Attach `MIGRATION_REPORT.md` or other supporting outputs as linked files in the PR description."
 
 ### 6.11 Glossary Term Lint
 > "Run glossary lint. Reject inconsistent terminology and suggest fixes based on GLOSSARY.md."
@@ -535,4 +548,5 @@ docs: deprecate F-004; replace with F-009; refresh backlinks
 - **Audit trail.** Record upgrades in the destination repo’s changelog/ADR so teams know when the instruction set changed.
 
 ### Release notes
+- **1.2.0 (2025-10-05):** Added Codex workflow for documentation pull requests, introduced a populated PR template, and expanded guidance for automating PR creation.
 - **1.1.0 (2025-10-04):** Added semantic versioning metadata, release notes, and automation guidance for syncing instruction sets across repositories.

@@ -192,12 +192,28 @@ Deprecate feature F-004
 
 1. **Enter the destination repo.** Open a Codex session rooted in the project that just received the updated instruction set.
 2. **Run the upgrade prompt.** Ask Codex:  
-   `Upgrade Docs System to instruction set v1.1.0; confirm integrity checks pass.`  
+   `Upgrade Docs System to instruction set v1.2.0; confirm integrity checks pass.`  
    (Update the version string when newer releases arrive.)
 3. **Let Codex migrate assets.** The workflow applies template changes, refreshes feature specs, rebuilds `FEATURES.md`/`PRODUCT_MAP.md`, updates backlinks, and regenerates checklists plus `MIGRATION_REPORT.md`.
 4. **Review and finalize.** Inspect the migration report and diffs, run any tests you require, then capture the changes in a commit/PR.
 
 > Codex only performs these upgrades when you explicitly request them; syncing the file alone does not update the rest of the documentation.
+
+---
+
+## 📥 Opening Pull Requests with the Docs Template
+
+1. **Capture diffs.** Make sure all spec, index, and scaffold changes are staged locally after the post-sync upgrade.
+2. **Gather context.** Note every impacted feature ID, updated spec path, ADR change, and verification step.
+3. **Prompt Codex.** Ask:  
+   `Open docs PR for [F-IDs]; gather impacted features, ADRs, tests; fill PR template and create PR.`  
+   Codex should populate `.github/PULL_REQUEST_TEMPLATE.md` with concrete data (no placeholders left) and tick only the checklist items completed in this run.
+4. **Create the PR.** Use the generated body via the CLI:  
+   `gh pr create --title "docs: <summary> [F-IDs]" --template docs-system`  
+   (Drop `--template` if the file is named `PULL_REQUEST_TEMPLATE.md` at the repo root or you prefer the default template.)
+5. **Review before submitting.** Double-check the table, ADR links, verification notes, and follow-ups; add attachments such as `MIGRATION_REPORT.md` as needed.
+
+> GitHub does not auto-populate the template—Codex (or you) must replace the guidance comments before creating the pull request.
 
 ---
 
