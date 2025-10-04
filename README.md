@@ -125,6 +125,15 @@ Link ADR to feature F-003
 
 ---
 
+### ADR workflow essentials
+- **What is an ADR?** Architecture Decision Records capture consequential technical or product decisions, their context, and trade-offs. They live in `docs/DECISIONS/` and exist alongside feature specs for long-term traceability.
+- **Who creates them?** ADRs are created on demand by prompting Codex (as above) or by manually copying `docs/DECISIONS/ADR_TEMPLATE.md`. The system does not auto-generate ADRs—you must request them when a decision warrants documentation.
+- **When to write one.** Create an ADR when a change affects architecture, persistence choices, security posture, or any decision that future contributors may need to revisit. Routine tweaks or purely cosmetic tasks usually stay in issues/tickets instead.
+- **Codex workflow.** Use prompts like `Create ADR "<Decision>":` with context/decision/consequences/alternatives. Codex will fill the template, link the ADR to relevant features, and refresh backlinks. Follow up by marking the ADR in the feature spec’s Links section if additional associations arise.
+- **Maintenance.** Project maintainers decide when an ADR moves from `proposed` to `accepted` or `superseded`. When that happens, prompt Codex to update the ADR file (for example: `Update ADR "ADR-0005": mark status accepted; supersedes ADR-0002`). Codex will edit the frontmatter, adjust `supersedes`/`superseded_by`, and refresh backlinks so the decision history stays consistent.
+
+---
+
 ### 7. Renaming a Feature Safely
 **Scenario:** You want to rename "Formatting Engine" to "Text Formatter".  
 **Instruction to Codex:**
