@@ -166,8 +166,14 @@ Deprecate feature F-004
    `python scripts/sync_instruction_set.py <destination> --dry-run`  
 3. **Apply the update.** Copy the instruction set when ready:  
    `python scripts/sync_instruction_set.py <destination>`  
-4. **Handle edge cases.** Add `--target <relative/path.md>` to place the file somewhere other than `docs/DOCS_SYSTEM_INSTRUCTION_SET.md`; add `--force` if you intentionally need to overwrite a newer version.  
+4. **Handle edge cases.** Use optional flags when you need different behavior (see flag reference below).  
 5. **Follow-up.** Run the `Upgrade Docs System` Codex workflow in the destination repo to regenerate maps, backlinks, and checklists.  
+
+**Flag reference**  
+- `--dry-run` prints the planned copy action without writing files; safe for validation.  
+- `--force` overwrites even if the destination already has the same or newer version.  
+- `--target <relative/path.md>` copies to a custom location instead of `docs/DOCS_SYSTEM_INSTRUCTION_SET.md`.  
+- `--quiet` suppresses non-error output for scripting.  
 
 > The script copies the latest instruction set when the destination is missing the file or carries an older/non-versioned copy.
 
