@@ -36,15 +36,19 @@ The system is **LLM-friendly**, using machine markers (`<!-- AUTOGEN:... -->`) s
 This system works by giving **Codex-style instructions** that trigger updates across the entire documentation set. Below are common scenarios with clear step-by-step instructions:
 
 ### 1. Bootstrapping the System
-**Scenario:** Starting a new repository from scratch.  
-**Instruction to Codex:**
+**Scenario:** You need to add the spec system to a repo that doesn't have any of its files yet (brand-new or existing).  
+**Prep steps (run from this repository):**
+1. Dry-run the sync script to see what will be copied: `python scripts/sync_instruction_set.py <destination> --dry-run`
+2. Replace `<destination>` with the root of your project and rerun without `--dry-run` to copy the instruction set into that repo.
+**Instruction to Codex (run inside `<destination>`):**
 ```
 Bootstrap the spec system
 ```
 **What happens:**
-- Creates the full `docs/` folder structure.  
+- Codex detects the synced instruction set and scaffolds the full `docs/` folder structure in your project.  
 - Generates templates and example files.  
 - Initializes `MASTER_SPEC.md`, `FEATURES.md`, `PRODUCT_MAP.md`.  
+**Note:** If `<destination>` doesn't contain `DOCS_SYSTEM_INSTRUCTION_SET.md`, Codex cannot execute the bootstrap prompt—always run the sync script first.
 
 ---
 
