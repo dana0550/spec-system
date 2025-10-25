@@ -28,6 +28,7 @@ The system is **LLM-friendly**, using machine markers (`<!-- AUTOGEN:... -->`) s
 - **Autogen markers** → Codex auto-refreshes TOCs, children, references, and development checklists.  
 - **Development Status** → requirements & acceptance criteria auto-generate checklists with traceability.  
 - **Changelog support** → every file tracks changes at the bottom.  
+- **Migration + audit tooling** → `scripts/migrate_existing_project.py` inventories legacy docs, runs a code audit, and scaffolds spec files for existing products.
 
 ---
 
@@ -40,6 +41,8 @@ This system works by giving **Codex-style instructions** that trigger updates ac
 **Prep steps (run from this repository):**
 1. Dry-run the sync script to see what will be copied: `python scripts/sync_instruction_set.py <destination> --dry-run`
 2. Replace `<destination>` with the root of your project and rerun without `--dry-run` to copy the instruction set into that repo.
+3. (Existing repos only) Generate a migration plan and run the code audit:
+   `python scripts/migrate_existing_project.py --source <destination> --destination <destination> --report MIGRATION_REPORT.md --apply`
 **Instruction to Codex (run inside `<destination>`):**
 ```
 Bootstrap the spec system
@@ -49,6 +52,28 @@ Bootstrap the spec system
 - Generates templates and example files.  
 - Initializes `MASTER_SPEC.md`, `FEATURES.md`, `PRODUCT_MAP.md`.  
 **Note:** If `<destination>` doesn't contain `DOCS_SYSTEM_INSTRUCTION_SET.md`, Codex cannot execute the bootstrap prompt—always run the sync script first.
+
+---
+
+### 1b. Migration & Code Audit for Existing Projects
+**Goal:** Port legacy documentation and infer development progress before Codex regenerates the specs.  
+**Steps:**
+1. From this repository, run `python scripts/migrate_existing_project.py --source <legacy_repo> --destination <legacy_repo> --report MIGRATION_REPORT.md` to generate a migration plan without writing files. Add `--json` for automation workflows.
+2. When you're comfortable with the plan, re-run with `--apply` (and optionally `--force`) so it scaffolds `docs/`, feature specs, and `MIGRATION_REPORT.md` inside `<legacy_repo>`.
+3. Review the generated `docs/FEATURES.md`, individual feature specs, and the audit evidence, then open Codex in `<legacy_repo>` and run `Bootstrap the spec system` followed by the standard `Upgrade Docs System…` prompt.
+
+**What the script does:**
+- Scans Markdown files for feature headings or checklists, assigns stable IDs, and drafts spec stubs with summaries pulled from the original doc.
+- Performs a lightweight code audit across the repo, looking for feature name references, TODO/FIXME markers, and `deprecated` annotations to categorize work as `done`, `in_progress`, `not_started`, or `deprecated`.
+- Emits `MIGRATION_REPORT.md` that blends doc signals and code audit findings so you can reconcile discrepancies before formalizing the spec.
+
+**Flags to know:**
+- `--no-audit` skips the code scan if you only need doc extraction.  
+- `--apply` writes spec artifacts; omit it for a dry run.  
+- `--force` overwrites existing spec files (only use once you've reviewed diffs).  
+- `--report <filename>` lets you produce multiple migration snapshots.
+
+> Treat the output as a first draft: the script favors recall over precision, so you should review each generated spec and adjust statuses before publishing the docs.
 
 ---
 
