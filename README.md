@@ -41,7 +41,12 @@ This system works by giving **Codex-style instructions** that trigger updates ac
 **Prep steps (run from this repository):**
 1. Dry-run the sync script to see what will be copied: `python scripts/sync_instruction_set.py <destination> --dry-run`
 2. Replace `<destination>` with the root of your project and rerun without `--dry-run` to copy the instruction set into that repo.
-3. (Existing repos only) Generate a migration plan and run the code audit:
+   - To grab the absolute path quickly:
+     - macOS Finder: open the folder, press `⌘ + Option + C` to copy its path.
+     - Linux GNOME Files: right-click the folder and choose **Copy Location**.
+     - Windows Explorer: click the address bar and copy the full path (or Shift+Right Click → **Copy as path**).
+   - Alternatively, skip manual copying by appending `--gui` to the migration command; a folder picker will collect the path for you.
+3. (Existing repos only) Generate a migration plan and run the code audit (this also produces `MIGRATION_REPORT.md` and `CODEX_MIGRATION_PROMPT.md` in `<destination>`):
    `python scripts/migrate_existing_project.py --source <destination> --destination <destination> --report MIGRATION_REPORT.md --apply`
 **Instruction to Codex (run inside `<destination>`):**
 ```
@@ -59,21 +64,41 @@ Bootstrap the spec system
 **Goal:** Port legacy documentation and infer development progress before Codex regenerates the specs.  
 **Steps:**
 1. From this repository, run `python scripts/migrate_existing_project.py --source <legacy_repo> --destination <legacy_repo> --report MIGRATION_REPORT.md` to generate a migration plan without writing files. Add `--json` for automation workflows.
-2. When you're comfortable with the plan, re-run with `--apply` (and optionally `--force`) so it scaffolds `docs/`, feature specs, and `MIGRATION_REPORT.md` inside `<legacy_repo>`.
-3. Review the generated `docs/FEATURES.md`, individual feature specs, and the audit evidence, then open Codex in `<legacy_repo>` and run `Bootstrap the spec system` followed by the standard `Upgrade Docs System…` prompt.
+   - Tip: reuse the path you copied above so `--source`/`--destination` point to the exact project root.
+   - Prefer an interactive selection? Run `python scripts/migrate_existing_project.py --gui --report MIGRATION_REPORT.md` and pick the repo; you can still add `--apply` or `--json` as needed.
+2. When you're comfortable with the plan, re-run with `--apply` (and optionally `--force`) so it scaffolds `docs/`, feature specs, `MIGRATION_REPORT.md`, and `CODEX_MIGRATION_PROMPT.md` inside `<legacy_repo>`.
+3. Review the generated `docs/FEATURES.md`, individual feature specs, and the audit evidence. Then open Codex in `<legacy_repo>`, paste the contents of `CODEX_MIGRATION_PROMPT.md`, and let it execute the deep migration. Finish by running `Upgrade Docs System…` to refresh AUTOGEN sections (after `Bootstrap the spec system` if you have not already triggered it).
 
 **What the script does:**
 - Scans Markdown files for feature headings or checklists, assigns stable IDs, and drafts spec stubs with summaries pulled from the original doc.
 - Performs a lightweight code audit across the repo, looking for feature name references, TODO/FIXME markers, and `deprecated` annotations to categorize work as `done`, `in_progress`, `not_started`, or `deprecated`.
 - Emits `MIGRATION_REPORT.md` that blends doc signals and code audit findings so you can reconcile discrepancies before formalizing the spec.
+- Generates `CODEX_MIGRATION_PROMPT.md`, a ready-to-paste instruction set that directs Codex to perform a thorough migration using the gathered evidence.
 
 **Flags to know:**
 - `--no-audit` skips the code scan if you only need doc extraction.  
 - `--apply` writes spec artifacts; omit it for a dry run.  
 - `--force` overwrites existing spec files (only use once you've reviewed diffs).  
 - `--report <filename>` lets you produce multiple migration snapshots.
+- `--prompt <filename>` customizes where the Codex-ready prompt is written.
+- `--gui` opens a folder picker and defaults both `--source` and `--destination` to the chosen directory.
 
 > Treat the output as a first draft: the script favors recall over precision, so you should review each generated spec and adjust statuses before publishing the docs.
+
+---
+
+### Codex Deep Migration Prompt
+- Open `<legacy_repo>/CODEX_MIGRATION_PROMPT.md` and paste the enclosed block into your Codex session while rooted in that repository.
+- Approve Codex as it reconciles `MIGRATION_REPORT.md`, legacy docs, and scaffolded spec files—expect it to adjust statuses, propagate hierarchies, and populate requirements/acceptance criteria.
+- Capture any lingering questions or follow-up tasks in `MIGRATION_REPORT.md` under a new `Post-Migration` heading before finishing the session.
+
+---
+
+### Post-Migration Review Checklist
+- Cross-reference `docs/FEATURES.md` with `MIGRATION_REPORT.md`; confirm lifecycle status and progress for every feature.
+- Walk each generated feature spec to replace placeholder text, migrate requirements/ACs, and add links to tickets, PRs, or tests.
+- Ensure `docs/PRODUCT_MAP.md` mirrors the hierarchy you expect customers to navigate, then regenerate backlinks if Codex did not already.
+- Review changelog updates and stage diffs; summarize notable decisions in the repo’s changelog or PR template before publishing.
 
 ---
 

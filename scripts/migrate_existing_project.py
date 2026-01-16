@@ -11,6 +11,8 @@ This utility performs three high-level tasks for a destination project:
    deprecation annotations.
 3. Emits a migration plan that maps the extracted information onto the
    Spec System structure (MASTER_SPEC, FEATURES, feature specs, product map).
+4. Generates a Codex-ready prompt that guides a deep migration session once
+   the destination repo is bootstrapped.
 
 Nothing is written unless `--apply` is provided. By default the script
 produces a report on stdout and saves a markdown migration summary to the
@@ -123,6 +125,8 @@ class MigrationArtifacts:
     product_map: str
     features_table: str
     feature_specs: Dict[str, str]
+    codex_prompt: str
+    prompt_path: Path
 
 
 def normalize_status(text: Optional[str]) -> Optional[str]:
@@ -166,6 +170,25 @@ def split_checkbox_body(body: str) -> Tuple[str, Optional[str]]:
 def slugify(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower())
     return re.sub(r"-+", "-", slug).strip("-") or "feature"
+
+
+def pick_directory_with_gui(title: str) -> Path:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError as exc:  # pragma: no cover - defensive guard
+        raise SystemExit("GUI directory selection requires tkinter; install it or pass --source/--destination") from exc
+
+    root = tk.Tk()
+    root.withdraw()
+    root.update()
+    selected = filedialog.askdirectory(title=title)
+    root.destroy()
+
+    if not selected:
+        raise SystemExit("No directory selected; aborting migration.")
+
+    return Path(selected)
 
 
 def collect_markdown_files(root: Path) -> List[Path]:
@@ -378,6 +401,52 @@ def render_product_map(features: List[FeatureCandidate]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_codex_prompt(
+    features: List[FeatureCandidate],
+    destination: Path,
+    report_filename: str,
+) -> str:
+    prompt_lines = [
+        "Deep-migrate the legacy documentation into the Spec System:",
+        f"- Use the migration signal in {report_filename} to prioritize work.",
+        "- For each feature below, reconcile documentation vs. code evidence and update docs/FEATURES.md, docs/PRODUCT_MAP.md, and the matching feature spec under docs/features/.",
+        "- Preserve or reconstruct requirements, acceptance criteria, and changelog entries from the source documents.",
+        "- Align lifecycle status (active/deprecated/etc.) and progress checkboxes with the audit findings.",
+        "- Ensure AUTOGEN sections remain intact; rerun integrity checks and regenerate backlinks/product map as needed.",
+        "- Summarize any remaining gaps or follow-up work in MIGRATION_REPORT.md under a `Post-Migration` heading.",
+        "",
+        "Feature checklist:",
+    ]
+
+    for feature in features:
+        try:
+            source_hint = feature.source_path.relative_to(destination)
+        except ValueError:
+            source_hint = feature.source_path
+        prompt_lines.append(
+            f"- {feature.id}: {feature.name} (doc={feature.doc_status or 'unknown'}, code={feature.code_status or 'unknown'}) ← {source_hint}"
+        )
+
+    prompt_lines.extend(
+        [
+            "",
+            "Deliverables:",
+            "- Updated spec system files reflecting the reconciled state.",
+            f"- {report_filename} annotated with final actions taken.",
+            "- Confirmation that FEATURE IDs, hierarchy, and statuses align across FEATURES.md and PRODUCT_MAP.md.",
+        ]
+    )
+
+    prompt_body = "\n".join(prompt_lines)
+    return (
+        "# Codex Migration Prompt\n\n"
+        "Paste the following prompt into Codex while rooted at the destination repo after syncing the instruction set and bootstrapping:\n\n"
+        "```\n"
+        f"{prompt_body}\n"
+        "```\n"
+    )
+
+
 def render_feature_spec(feature: FeatureCandidate) -> str:
     summary = feature.summary or "_Summary migrated from legacy documentation. Flesh this out._"
     evidence_block = "\n".join(f"- {item}" for item in feature.evidence) or "- (No code references discovered)"
@@ -487,10 +556,13 @@ def build_artifacts(
     features: List[FeatureCandidate],
     master_spec_source: Optional[Path],
     report_filename: str,
+    prompt_filename: str,
 ) -> MigrationArtifacts:
     report_path = destination / report_filename
     features_table = render_features_table(features)
     product_map = render_product_map(features)
+    prompt_path = destination / prompt_filename
+    codex_prompt = render_codex_prompt(features, destination, report_filename)
 
     feature_specs = {feature.id: render_feature_spec(feature) for feature in features}
 
@@ -501,6 +573,8 @@ def build_artifacts(
         product_map=product_map,
         features_table=features_table,
         feature_specs=feature_specs,
+        codex_prompt=codex_prompt,
+        prompt_path=prompt_path,
     )
 
 
@@ -513,8 +587,24 @@ def find_master_spec_source(markdown_files: Sequence[Path]) -> Optional[Path]:
 
 
 def run_migration(args: argparse.Namespace) -> None:
-    source = Path(args.source).resolve()
-    destination = Path(args.destination).resolve()
+    gui_selection: Optional[Path] = None
+    if args.gui:
+        gui_selection = pick_directory_with_gui("Select project root for spec migration")
+
+    if args.source:
+        source = Path(args.source).resolve()
+    elif gui_selection:
+        source = gui_selection.resolve()
+    else:
+        raise SystemExit("Provide --source or use --gui to choose the legacy project root.")
+
+    if args.destination:
+        destination = Path(args.destination).resolve()
+    elif gui_selection:
+        destination = gui_selection.resolve()
+    else:
+        destination = source
+
     destination.mkdir(parents=True, exist_ok=True)
 
     markdown_files = collect_markdown_files(source)
@@ -535,8 +625,16 @@ def run_migration(args: argparse.Namespace) -> None:
         perform_code_audit(features, source)
 
     report_filename = args.report
-    artifacts = build_artifacts(destination, features, find_master_spec_source(markdown_files), report_filename)
+    prompt_filename = args.prompt
+    artifacts = build_artifacts(
+        destination,
+        features,
+        find_master_spec_source(markdown_files),
+        report_filename,
+        prompt_filename,
+    )
     render_migration_report(features, artifacts.report_path)
+    artifacts.prompt_path.write_text(artifacts.codex_prompt, encoding="utf-8")
 
     if args.apply:
         apply_artifacts(destination, artifacts, force=args.force)
@@ -546,6 +644,7 @@ def run_migration(args: argparse.Namespace) -> None:
         "report": str(artifacts.report_path),
         "applied": bool(args.apply),
         "destination": str(destination),
+        "codex_prompt": str(artifacts.prompt_path),
     }
 
     if args.json:
@@ -557,10 +656,9 @@ def run_migration(args: argparse.Namespace) -> None:
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", required=True, help="Path to the legacy project root")
+    parser.add_argument("--source", help="Path to the legacy project root")
     parser.add_argument(
         "--destination",
-        required=True,
         help="Location to write spec system artifacts (often same as --source)",
     )
     parser.add_argument(
@@ -582,6 +680,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Emit a machine-readable summary on stdout",
+    )
+    parser.add_argument(
+        "--prompt",
+        default="CODEX_MIGRATION_PROMPT.md",
+        help="Filename for the Codex prompt generated alongside the report",
+    )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Open a folder picker to choose the project root interactively",
     )
     parser.add_argument(
         "--no-audit",
