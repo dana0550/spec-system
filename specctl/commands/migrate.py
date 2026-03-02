@@ -19,6 +19,14 @@ LEGACY_STATUS_MAP = {
     "in_progress": "implementing",
     "done": "done",
     "deprecated": "deprecated",
+    "requirements_draft": "requirements_draft",
+    "requirements_approved": "requirements_approved",
+    "design_draft": "design_draft",
+    "design_approved": "design_approved",
+    "tasks_draft": "tasks_draft",
+    "tasks_approved": "tasks_approved",
+    "implementing": "implementing",
+    "verifying": "verifying",
 }
 
 
