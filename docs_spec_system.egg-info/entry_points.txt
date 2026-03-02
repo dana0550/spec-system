@@ -1,0 +1,2 @@
+[console_scripts]
+specctl = specctl.cli:main

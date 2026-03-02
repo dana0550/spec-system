@@ -1,3 +1,13 @@
+Metadata-Version: 2.4
+Name: docs-spec-system
+Version: 2.0.0
+Summary: Spec System v2 CLI and skill package
+Author: docs-spec-system
+License: MIT
+Keywords: spec,documentation,llm,requirements,traceability
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+
 # docs-spec-system
 
 This repository distributes the `docs-spec-system` Codex Skill and Spec System v2 CLI (`specctl`).

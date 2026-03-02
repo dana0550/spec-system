@@ -1,40 +1,32 @@
-# Release And PR Workflow
+# Release And PR Workflow (v2)
 
-Use this flow after any docs-system change set.
+## Required Validation Before PR
 
-## Post-Change Validation
+1. `specctl lint`
+2. `specctl render --check`
+3. `specctl check`
+4. Unit and integration tests
 
-1. Run integrity checks from `references/spec-system-rules.md`.
-2. Confirm impacted IDs are consistent across:
-- `docs/FEATURES.md`
-- `docs/features/*.md`
-- `docs/PRODUCT_MAP.md`
-3. Confirm all required AUTOGEN blocks exist and are refreshed.
-4. Confirm changelog updates were appended for touched feature specs.
-5. Confirm deprecated features are in deprecated map sections only.
+Blocking condition:
 
-## PR Assembly Procedure
+- Any `ERROR` in lint/check output.
 
-1. Load `assets/docs-system-pr-template.md`.
-2. Replace every guidance comment with concrete details from current diffs.
-3. Fill summary with 2-3 bullets describing what changed and why.
-4. Fill Feature Coverage with all touched IDs (new/updated/deprecated/re-parented/renamed).
-5. Fill Decisions & ADRs with created/updated/superseded ADR IDs.
-6. Tick only completed integrity checklist items.
-7. Add verification notes (tests, lint, manual QA, integrity validation).
-8. Add follow-ups/risks for rollout, budgets, or security items.
+## PR Assembly
 
-## PR Quality Gates
+1. Use `assets/docs-system-pr-template.md`.
+2. Include all impacted IDs (`F`, `R`, `D`, `T`, `S`).
+3. Include phase approvals performed.
+4. Include migration notes (if `migrate-v1-to-v2` was used).
+5. Include traceability and verification evidence links.
+6. Include exact command outputs used for validation.
 
-- No placeholder text remains in PR template fields.
-- All touched features appear in Feature Coverage.
-- ADR references resolve.
-- Validation evidence is explicit and reproducible.
+## Release Gates
 
-## Suggested Prompt Pattern
+- No placeholders in PR template.
+- `specctl check` passes.
+- Migration path documented for users.
+- README and agent prompt are aligned with v2 command interface.
 
-Use `$docs-spec-system` to prepare a docs PR for `[F-IDs]`, populate the PR template from `assets/docs-system-pr-template.md`, include ADR/test/integrity evidence, and output a ready-to-submit PR body with no placeholders.
+## Suggested PR Title
 
-## Suggested PR Title Format
-
-`docs: <concise summary> [F-IDs]`
+`docs: spec system v2 update [F-IDs]`
