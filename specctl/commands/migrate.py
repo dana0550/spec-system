@@ -11,8 +11,8 @@ from specctl.io_utils import now_date, now_timestamp, slugify, write_text
 from specctl.validators.project import lint_project
 
 
-REQ_V1_RE = re.compile(r"^\s*[-*]\s*R\d+\s*:\s*(.+)$", re.IGNORECASE)
-AC_V1_RE = re.compile(r"^\s*[-*]\s*AC\d+\s*:\s*(.+)$", re.IGNORECASE)
+REQ_V1_RE = re.compile(r"^\s*[-*]\s*R\d+\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+AC_V1_RE = re.compile(r"^\s*[-*]\s*AC\d+\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 LEGACY_STATUS_MAP = {
     "proposed": "requirements_draft",
     "not_started": "requirements_draft",
