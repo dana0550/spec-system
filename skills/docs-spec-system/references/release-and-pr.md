@@ -39,6 +39,10 @@ Blocking condition:
    - `specctl lint`, `specctl render --check`, `specctl check`, and tests pass
 6. On pass, workflow publishes GitHub Release for the tag.
 
+Automation note:
+
+- `auto-tag-from-main.yml` creates and pushes `v<pyproject.version>` automatically on `main` pushes if missing, which then triggers `release.yml`.
+
 ## Suggested PR Title
 
 `docs: spec system v2 update [F-IDs]`

@@ -66,6 +66,7 @@ Release policy:
 - Tag only from `main`.
 - Tag must match `pyproject.toml` project version.
 - Tag triggers `.github/workflows/release.yml`, which runs validation gates and publishes the GitHub Release.
+- `.github/workflows/auto-tag-from-main.yml` automatically creates the version tag after merges to `main` when the tag does not already exist.
 
 ## Repository Layout
 
