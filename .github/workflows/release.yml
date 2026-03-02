@@ -30,7 +30,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install package
-        run: pip install -e .
+        run: |
+          pip install -e .
+          pip install pytest
 
       - name: Verify tag matches pyproject version
         run: |

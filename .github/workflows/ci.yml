@@ -16,7 +16,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install package
-        run: pip install -e .
+        run: |
+          pip install -e .
+          pip install pytest
 
       - name: Lint fixture docs
         run: python -m specctl.cli lint --root tests/fixtures/v2_docs
