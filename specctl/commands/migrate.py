@@ -12,13 +12,26 @@ from specctl.validators.project import lint_project
 
 REQ_V1_RE = re.compile(r"^\s*[-*]\s*R\d+\s*:\s*(.+)$", re.IGNORECASE)
 AC_V1_RE = re.compile(r"^\s*[-*]\s*AC\d+\s*:\s*(.+)$", re.IGNORECASE)
+LEGACY_STATUS_MAP = {
+    "proposed": "requirements_draft",
+    "not_started": "requirements_draft",
+    "active": "implementing",
+    "in_progress": "implementing",
+    "done": "done",
+    "deprecated": "deprecated",
+}
 
 
 def run(args) -> int:
     root = Path(args.root).resolve()
     docs = root / "docs"
-    docs.mkdir(parents=True, exist_ok=True)
 
+    backup_dir = root / ".specctl-backups" / f"migrate-{now_timestamp()}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    if docs.exists():
+        shutil.copytree(docs, backup_dir / "docs", dirs_exist_ok=True)
+
+    docs.mkdir(parents=True, exist_ok=True)
     _ensure_base_v2_docs(docs)
 
     features_path = docs / "FEATURES.md"
@@ -27,11 +40,6 @@ def run(args) -> int:
     if not v1_feature_rows:
         print("[ERROR] No features found in docs/FEATURES.md")
         return 1
-
-    backup_dir = root / ".specctl-backups" / f"migrate-{now_timestamp()}"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    if docs.exists():
-        shutil.copytree(docs, backup_dir / "docs", dirs_exist_ok=True)
 
     migrated_rows: list[FeatureRow] = []
     report_lines = ["# Migration Report", "", f"Date: {now_date()}", ""]
@@ -66,6 +74,10 @@ def run(args) -> int:
             for idx, statement in enumerate(ac_statements, start=1)
         ]
 
+        mapped_status = _map_legacy_status(row.status)
+        if mapped_status != row.status:
+            report_lines.append(f"- Status mapped for {row.feature_id}: '{row.status}' -> '{mapped_status}'")
+
         write_text(
             feature_dir / "requirements.md",
             "\n".join(
@@ -74,7 +86,7 @@ def run(args) -> int:
                     "doc_type: feature_requirements",
                     f"feature_id: {row.feature_id}",
                     f"name: {row.name}",
-                    f"status: {row.status}",
+                    f"status: {mapped_status}",
                     f"owner: {row.owner}",
                     f"last_updated: {now_date()}",
                     "---",
@@ -94,6 +106,7 @@ def run(args) -> int:
                     "---",
                     "doc_type: feature_design",
                     f"feature_id: {row.feature_id}",
+                    f"status: {mapped_status}",
                     f"last_updated: {now_date()}",
                     "---",
                     f"# {row.name} Design",
@@ -114,6 +127,7 @@ def run(args) -> int:
                     "---",
                     "doc_type: feature_tasks",
                     f"feature_id: {row.feature_id}",
+                    f"status: {mapped_status}",
                     f"last_updated: {now_date()}",
                     "---",
                     f"# {row.name} Tasks",
@@ -134,6 +148,7 @@ def run(args) -> int:
                     "---",
                     "doc_type: feature_verification",
                     f"feature_id: {row.feature_id}",
+                    f"status: {mapped_status}",
                     f"last_updated: {now_date()}",
                     "---",
                     f"# {row.name} Verification",
@@ -155,7 +170,7 @@ def run(args) -> int:
             FeatureRow(
                 feature_id=row.feature_id,
                 name=row.name,
-                status=row.status,
+                status=mapped_status,
                 parent_id=row.parent_id,
                 spec_path=f"features/{feature_slug}/requirements.md",
                 owner=row.owner,
@@ -242,3 +257,8 @@ def _ensure_base_v2_docs(docs: Path) -> None:
         path = docs / name
         if not path.exists():
             write_text(path, content)
+
+
+def _map_legacy_status(status: str) -> str:
+    normalized = status.strip().lower()
+    return LEGACY_STATUS_MAP.get(normalized, "requirements_draft")

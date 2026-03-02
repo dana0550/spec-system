@@ -16,6 +16,13 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def set_frontmatter_value(path: Path, key: str, value: str) -> None:
+    text = read_text(path)
+    data, body = parse_frontmatter(text)
+    data[key] = value
+    write_text(path, dump_frontmatter(data) + body.lstrip("\n"))
+
+
 def slugify(value: str) -> str:
     value = value.strip().lower()
     value = re.sub(r"[^a-z0-9]+", "-", value)

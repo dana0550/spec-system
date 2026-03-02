@@ -29,5 +29,19 @@ jobs:
       - name: Check fixture docs
         run: python -m specctl.cli check --root tests/fixtures/v2_docs
 
+      - name: Smoke generated workspace
+        run: |
+          tmpdir="$(mktemp -d)"
+          python -m specctl.cli init --root "$tmpdir"
+          python -m specctl.cli feature create --root "$tmpdir" --name "SmokeFeature" --owner smoke@example.com
+          python -m specctl.cli check --root "$tmpdir"
+
+      - name: Migration smoke
+        run: |
+          tmpdir="$(mktemp -d)"
+          cp -R tests/fixtures/v1_docs/. "$tmpdir"
+          python -m specctl.cli migrate-v1-to-v2 --root "$tmpdir"
+          python -m specctl.cli check --root "$tmpdir"
+
       - name: Run tests
         run: python -m pytest

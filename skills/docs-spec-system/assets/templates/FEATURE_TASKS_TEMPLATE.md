@@ -1,6 +1,7 @@
 ---
 doc_type: feature_tasks
 feature_id: F-XXX
+status: tasks_draft
 last_updated: <yyyy-mm-dd>
 ---
 # <Feature Name> Tasks

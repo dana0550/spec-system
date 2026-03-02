@@ -7,4 +7,4 @@ last_synced: 2026-03-02
 
 | ID | Name | Status | Parent ID | Spec Path | Owner | Aliases |
 |----|------|--------|-----------|-----------|-------|---------|
-| F-001 | Login | requirements_draft |  | features/F-001-login.md | owner@example.com | [] |
+| F-001 | Login | active |  | features/F-001-login.md | owner@example.com | [] |

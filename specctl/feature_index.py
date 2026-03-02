@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from specctl.io_utils import read_text, write_text
+from specctl.io_utils import now_date, read_text, write_text
 from specctl.models import FeatureRow
 
 
@@ -45,7 +45,7 @@ def write_feature_rows(path: Path, rows: list[FeatureRow], version: str = "2.0.0
         "---",
         "doc_type: feature_index",
         f"version: {version}",
-        "last_synced: TBD",
+        f"last_synced: {now_date()}",
         "---",
         "# Features Index",
         "",

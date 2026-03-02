@@ -46,6 +46,26 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats]:
     else:
         messages.extend(validate_feature_ids(rows))
         messages.extend(validate_statuses(rows))
+        row_ids = {row.feature_id for row in rows}
+        for row in rows:
+            if row.parent_id and row.parent_id not in row_ids:
+                messages.append(
+                    LintMessage(
+                        severity="ERROR",
+                        code="PARENT_MISSING",
+                        message=f"Parent ID '{row.parent_id}' does not exist for {row.feature_id}",
+                        path=features_index_path,
+                    )
+                )
+            if row.parent_id == row.feature_id:
+                messages.append(
+                    LintMessage(
+                        severity="ERROR",
+                        code="PARENT_SELF",
+                        message=f"Feature {row.feature_id} cannot parent itself",
+                        path=features_index_path,
+                    )
+                )
 
     features_root = docs_dir / "features"
     if not features_root.exists():
@@ -59,8 +79,24 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats]:
         )
         return messages, stats
 
-    for feature_dir in sorted(p for p in features_root.iterdir() if p.is_dir()):
-        messages.extend(validate_requirements_file(feature_dir / "requirements.md"))
+    expected_feature_dirs: set[Path] = set()
+    for row in rows:
+        req_path = docs_dir / row.spec_path
+        if not req_path.exists():
+            messages.append(
+                LintMessage(
+                    severity="ERROR",
+                    code="SPEC_PATH_MISSING",
+                    message=f"Spec path for {row.feature_id} is missing: {row.spec_path}",
+                    path=req_path,
+                )
+            )
+            continue
+
+        feature_dir = req_path.parent.resolve()
+        expected_feature_dirs.add(feature_dir)
+
+        messages.extend(validate_requirements_file(req_path))
         trace_msgs, trace_stats = validate_feature_traceability(feature_dir)
         messages.extend(trace_msgs)
         stats.requirements_total += trace_stats.requirements_total
@@ -68,5 +104,16 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats]:
         stats.requirements_with_tasks += trace_stats.requirements_with_tasks
         stats.scenarios_total += trace_stats.scenarios_total
         stats.scenarios_with_evidence += trace_stats.scenarios_with_evidence
+
+    for feature_dir in sorted(p for p in features_root.iterdir() if p.is_dir()):
+        if feature_dir.resolve() not in expected_feature_dirs:
+            messages.append(
+                LintMessage(
+                    severity="ERROR",
+                    code="FEATURE_DIR_ORPHAN",
+                    message=f"Feature directory has no matching FEATURES.md row: {feature_dir.name}",
+                    path=feature_dir,
+                )
+            )
 
     return messages, stats

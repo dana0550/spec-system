@@ -1,6 +1,7 @@
 ---
 doc_type: feature_design
 feature_id: F-XXX
+status: design_draft
 last_updated: <yyyy-mm-dd>
 ---
 # <Feature Name> Design

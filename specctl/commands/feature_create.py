@@ -11,19 +11,28 @@ def run(args) -> int:
     docs = root / "docs"
     features_index = docs / "FEATURES.md"
     rows = read_feature_rows(features_index)
+    existing_ids = {row.feature_id for row in rows}
+
+    if args.parent_id and args.parent_id not in existing_ids:
+        print(f"[ERROR] Parent ID not found: {args.parent_id}")
+        return 1
 
     feature_id = args.feature_id
     if not feature_id:
         feature_id = next_child_id(rows, args.parent_id) if args.parent_id else next_top_level_id(rows)
+    elif feature_id in existing_ids:
+        print(f"[ERROR] Feature ID already exists: {feature_id}")
+        return 1
 
     name = args.name.strip()
+    status = args.status
     slug = f"{feature_id}-{slugify(name)}"
     spec_path = f"features/{slug}/requirements.md"
 
     row = FeatureRow(
         feature_id=feature_id,
         name=name,
-        status=args.status,
+        status=status,
         parent_id=args.parent_id or "",
         spec_path=spec_path,
         owner=args.owner or "unassigned",
@@ -44,7 +53,7 @@ def run(args) -> int:
                 "doc_type: feature_requirements",
                 f"feature_id: {feature_id}",
                 f"name: {name}",
-                f"status: {args.status}",
+                f"status: {status}",
                 f"owner: {args.owner or 'unassigned'}",
                 f"last_updated: {now_date()}",
                 "---",
@@ -64,6 +73,7 @@ def run(args) -> int:
                 "---",
                 "doc_type: feature_design",
                 f"feature_id: {feature_id}",
+                f"status: {status}",
                 f"last_updated: {now_date()}",
                 "---",
                 f"# {name} Design",
@@ -81,6 +91,7 @@ def run(args) -> int:
                 "---",
                 "doc_type: feature_tasks",
                 f"feature_id: {feature_id}",
+                f"status: {status}",
                 f"last_updated: {now_date()}",
                 "---",
                 f"# {name} Tasks",
@@ -98,6 +109,7 @@ def run(args) -> int:
                 "---",
                 "doc_type: feature_verification",
                 f"feature_id: {feature_id}",
+                f"status: {status}",
                 f"last_updated: {now_date()}",
                 "---",
                 f"# {name} Verification",

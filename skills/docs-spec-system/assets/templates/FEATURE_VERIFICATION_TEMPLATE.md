@@ -1,6 +1,7 @@
 ---
 doc_type: feature_verification
 feature_id: F-XXX
+status: verifying
 last_updated: <yyyy-mm-dd>
 ---
 # <Feature Name> Verification

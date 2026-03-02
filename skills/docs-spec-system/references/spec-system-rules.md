@@ -86,6 +86,7 @@ Every feature must satisfy:
 - `tasks.md` references every `R-*` and corresponding `D-*`.
 - `verification.md` includes scenario evidence markers:
   - `Evidence: S-F... -> <artifact>`
+- Feature lifecycle `status` in `FEATURES.md` must be synchronized into each feature artifact frontmatter.
 
 Global contract:
 

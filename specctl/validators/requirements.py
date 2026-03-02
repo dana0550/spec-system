@@ -41,7 +41,7 @@ def validate_requirements_file(path: Path) -> list[LintMessage]:
         if req_match:
             requirement_count += 1
             req_id, statement = req_match.groups()
-            if not any(keyword in statement for keyword in RFC_KEYWORDS):
+            if not _contains_rfc_modal(statement):
                 messages.append(
                     LintMessage(
                         severity="ERROR",
@@ -67,6 +67,17 @@ def validate_requirements_file(path: Path) -> list[LintMessage]:
         scenario_match = SCENARIO_LINE_RE.match(line)
         if scenario_match:
             scenario_count += 1
+            scenario_id, scenario_text = scenario_match.groups()
+            if not _is_gherkin_shape(scenario_text):
+                messages.append(
+                    LintMessage(
+                        severity="ERROR",
+                        code="SCENARIO_GHERKIN",
+                        message=f"{scenario_id} must contain Given/When/Then in order",
+                        path=path,
+                        line=idx,
+                    )
+                )
 
     if requirement_count == 0:
         messages.append(
@@ -89,3 +100,21 @@ def validate_requirements_file(path: Path) -> list[LintMessage]:
         )
 
     return messages
+
+
+def _contains_rfc_modal(statement: str) -> bool:
+    upper = statement.upper()
+    keywords = sorted(RFC_KEYWORDS, key=len, reverse=True)
+    for keyword in keywords:
+        pattern = r"\b" + re.escape(keyword) + r"\b"
+        if re.search(pattern, upper):
+            return True
+    return False
+
+
+def _is_gherkin_shape(statement: str) -> bool:
+    upper = statement.upper()
+    given = upper.find("GIVEN")
+    when = upper.find("WHEN")
+    then = upper.find("THEN")
+    return given != -1 and when != -1 and then != -1 and given < when < then
