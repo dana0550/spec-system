@@ -1,4 +1,4 @@
 interface:
-  display_name: "Docs Spec System"
-  short_description: "Help with Docs Spec System tasks"
-  default_prompt: "Use $docs-spec-system to manage and propagate SSOT product docs across FEATURES.md, feature specs, and PRODUCT_MAP.md."
+  display_name: "Docs Spec System v2"
+  short_description: "Phase-gated spec system with strict traceability"
+  default_prompt: "Use $docs-spec-system and specctl to run the v2 phase-gated workflow (requirements -> design -> tasks -> verification) with EARS+RFC requirements, Gherkin scenarios, and full traceability."

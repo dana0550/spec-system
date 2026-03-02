@@ -1,36 +1,38 @@
 ---
 name: docs-spec-system
-description: Maintain a Markdown-only product spec system with FEATURES.md as the SSOT and deterministic propagation to feature specs and PRODUCT_MAP.md. Use when Codex must bootstrap docs, add or re-parent features, rename or deprecate features, update requirements and acceptance criteria with development status traceability, rebuild product map and backlinks, create or update ADRs, and prepare docs PR content using a template. Do not use this skill for legacy migration or code-audit workflows.
+description: Operate the Spec System v2 contract-first workflow with phase gates, EARS+RFC requirements, Gherkin scenarios, strict traceability, and first-class specctl enforcement.
 ---
 
-# Docs Spec System
+# Docs Spec System v2
 
-Execute documentation changes through an SSOT-first workflow and keep all derived docs synchronized.
+Run all docs-spec operations through the phase-gated v2 system.
 
 ## Runbook
 
-1. Read `references/spec-system-rules.md` before editing any docs files.
-2. Choose the task playbook in `references/workflows.md`.
-3. Update `FEATURES.md` first whenever feature identity, status, or hierarchy changes.
-4. Propagate updates to feature specs, `MASTER_SPEC.md`, and `PRODUCT_MAP.md`.
-5. Rebuild AUTOGEN sections and run the integrity checklist from `references/spec-system-rules.md`.
-6. Prepare release and PR artifacts using `references/release-and-pr.md` and `assets/docs-system-pr-template.md`.
-7. Return a concise diff summary including impacted IDs, files touched, and validation outcomes.
+1. Read `references/spec-system-rules.md` for mandatory schemas and gate invariants.
+2. Select the workflow in `references/workflows.md` that matches the requested change.
+3. Use `specctl` as the primary interface (`lint`, `render`, `check`, `approve`, `migrate-v1-to-v2`).
+4. Keep requirements, design, tasks, and verification artifacts synchronized per feature.
+5. Enforce `R -> D -> T -> S -> evidence` traceability before completion.
+6. Use `references/release-and-pr.md` and `assets/docs-system-pr-template.md` to assemble release/PR outputs.
 
 ## Required Output For Every Task
 
-- List impacted feature IDs and operation type (`new`, `updated`, `renamed`, `deprecated`, `re-parented`).
-- State which integrity checks passed or failed.
-- Note follow-up work if any item is intentionally deferred.
-- Keep ID references stable (`[F-###]`) and avoid name-only references for traceability.
+- List impacted IDs by type (`F`, `R`, `D`, `T`, `S`) and operation type.
+- Report phase transitions performed (if any).
+- Report `specctl check` result and blocking errors/warnings.
+- Call out unresolved traceability gaps or deferred follow-ups.
 
 ## Out-of-Scope Handling
 
-If the user requests legacy migration, code-audit inference, or script-driven scaffolding, state that this skill v1 intentionally excludes migration/audit workflows and continue with docs-only SSOT operations.
+- Do not infer implementation status from source code without explicit evidence.
+- Do not run legacy v1 script workflows.
+- Do not bypass phase gates unless the user explicitly requests a policy exception.
 
 ## Skill Resources
 
-- `references/spec-system-rules.md`: Canonical schemas, markers, propagation matrix, and integrity rules.
-- `references/workflows.md`: Task-specific procedures and acceptance conditions.
-- `references/release-and-pr.md`: Post-change validation and PR assembly flow.
-- `assets/docs-system-pr-template.md`: PR body template to populate with concrete data.
+- `references/spec-system-rules.md`: v2 schema, ID grammar, and quality gate rules.
+- `references/workflows.md`: phase-driven execution playbooks.
+- `references/release-and-pr.md`: PR assembly and release validation.
+- `assets/docs-system-pr-template.md`: v2 PR template.
+- `assets/templates/*.md`: canonical feature and governance templates.

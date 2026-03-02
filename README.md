@@ -1,63 +1,79 @@
 # docs-spec-system
 
-This repository now distributes the `docs-spec-system` Codex Skill.
+This repository distributes the `docs-spec-system` Codex Skill and Spec System v2 CLI (`specctl`).
 
-The skill provides a Markdown-only SSOT documentation workflow for:
-- bootstrapping docs structure
-- feature lifecycle operations (add, update, rename, re-parent, deprecate)
-- requirements/acceptance criteria traceability maintenance
-- ADR creation and updates
-- docs PR preparation with a structured template
+## What Changed In v2
 
-Legacy migration and code-audit workflows are intentionally out of scope in v1.
+- Phase-gated feature artifacts (`requirements`, `design`, `tasks`, `verification`)
+- Mandatory EARS + RFC requirement language
+- Mandatory Gherkin acceptance scenarios
+- Strict traceability chain: `R -> D -> T -> S -> evidence`
+- First-class CLI for deterministic lint/render/check/approve/migrate/report
+- Migration command from v1 docs layout
 
-## Install
-
-Install from this repository path using the skill installer tooling:
+## Install Skill
 
 ```bash
 install-skill-from-github.py --repo <owner>/<repo> --path skills/docs-spec-system
 ```
 
-After installation, restart Codex so the new skill is loaded.
+Restart Codex after installation.
 
-## Use
+## CLI Usage
 
-Invoke with prompts such as:
+```bash
+specctl init
+specctl feature create --name "User Authentication" --owner team@example.com
+specctl lint
+specctl render
+specctl check
+specctl approve --feature-id F-001 --phase requirements
+specctl migrate-v1-to-v2
+specctl report
+```
 
-- `Use $docs-spec-system to bootstrap docs for this project.`
-- `Use $docs-spec-system to add feature "Clipboard Actions" as active.`
-- `Use $docs-spec-system to rename F-002 and deprecate F-004.`
-- `Use $docs-spec-system to prepare a docs PR for F-003 and F-007.`
+## Migration
+
+For repositories using v1 docs shape:
+
+```bash
+specctl migrate-v1-to-v2
+specctl check
+```
+
+Migration writes backups to `.specctl-backups/migrate-<timestamp>/`.
+
+## Validation
+
+```bash
+python -m pytest
+```
+
+## Releases
+
+Official releases are Git tags and GitHub Releases.
+
+```bash
+git fetch origin
+git switch main
+git pull --ff-only
+git tag -a v2.0.0 -m "docs-spec-system v2.0.0"
+git push origin v2.0.0
+```
+
+Release policy:
+
+- Tag only from `main`.
+- Tag must match `pyproject.toml` project version.
+- Tag triggers `.github/workflows/release.yml`, which runs validation gates and publishes the GitHub Release.
 
 ## Repository Layout
 
 ```text
-skills/
-  docs-spec-system/
-    SKILL.md
-    agents/openai.yaml
-    references/
-      spec-system-rules.md
-      workflows.md
-      release-and-pr.md
-    assets/
-      docs-system-pr-template.md
-```
-
-## Deprecated Interfaces
-
-These script interfaces are no longer supported:
-
-- `python3 scripts/sync_instruction_set.py ...`
-- `python3 scripts/migrate_existing_project.py ...`
-
-All supported operations now flow through `$docs-spec-system`.
-
-## Local Validation
-
-Validate the skill package:
-
-```bash
-python3 /Users/dshakiba/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/docs-spec-system
+skills/docs-spec-system/
+  SKILL.md
+  references/
+  assets/
+specctl/
+tests/
 ```
