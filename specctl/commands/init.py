@@ -29,7 +29,6 @@ def run(args) -> int:
                 "# Master Spec",
                 "",
                 "## Vision",
-                "",
             ]
         )
         + "\n",
@@ -49,7 +48,6 @@ def run(args) -> int:
                 "## Product Constraints",
                 "",
                 "## Design Principles",
-                "",
             ]
         )
         + "\n",
@@ -68,7 +66,6 @@ def run(args) -> int:
                 "",
                 "| ID | Name | Status | Parent ID | Spec Path | Owner | Aliases |",
                 "|----|------|--------|-----------|-----------|-------|---------|",
-                "",
             ]
         )
         + "\n",
@@ -84,7 +81,6 @@ def run(args) -> int:
                 f"last_rendered: {now_date()}",
                 "---",
                 "# Product Map",
-                "",
             ]
         )
         + "\n",

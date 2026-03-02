@@ -49,6 +49,33 @@ def test_full_feature_lifecycle(tmp_path: Path) -> None:
     _assert_feature_status(root, "F-001", "requirements_approved")
 
 
+def test_feature_create_keeps_scenario_text_consistent_across_files(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "feature",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ScenarioConsistency",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
+    feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    req_text = (feature_dir / "requirements.md").read_text(encoding="utf-8")
+    ver_text = (feature_dir / "verification.md").read_text(encoding="utf-8")
+    expected = "Given valid input When the request is submitted Then the response status is 200."
+    assert f"- S-F001-001: {expected}" in req_text
+    assert f"- S-F001-001: {expected}" in ver_text
+
+
 def test_design_and_tasks_approvals_sync_frontmatter(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -258,6 +285,17 @@ def test_render_uses_features_last_synced_stamp(tmp_path: Path) -> None:
     assert "last_rendered: 2001-02-03" in product_map_text
     assert "last_rendered: 2001-02-03" in traceability_text
     assert main(["render", "--root", str(root), "--check"]) == 0
+
+
+def test_init_outputs_use_single_trailing_newline(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    docs = root / "docs"
+    for filename in ["MASTER_SPEC.md", "STEERING.md", "FEATURES.md", "PRODUCT_MAP.md"]:
+        content = (docs / filename).read_text(encoding="utf-8")
+        assert content.endswith("\n")
+        assert not content.endswith("\n\n")
 
 
 def test_hierarchy_cycle_is_rejected(tmp_path: Path) -> None:

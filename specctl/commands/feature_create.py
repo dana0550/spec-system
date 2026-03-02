@@ -57,6 +57,7 @@ def run(args) -> int:
 
     feature_dir = docs / "features" / slug
     feature_dir.mkdir(parents=True, exist_ok=True)
+    scenario_text = "Given valid input When the request is submitted Then the response status is 200."
 
     write_text(
         feature_dir / "requirements.md",
@@ -73,7 +74,7 @@ def run(args) -> int:
                 f"# {name} Requirements",
                 "",
                 f"- R-{feature_id.replace('-', '')}-001: WHEN a user submits valid input, the system MUST process the request and return a success response.",
-                f"- S-{feature_id.replace('-', '')}-001: Given valid input When the request is submitted Then the response status is 200.",
+                f"- S-{feature_id.replace('-', '')}-001: {scenario_text}",
             ]
         )
         + "\n",
@@ -127,7 +128,7 @@ def run(args) -> int:
                 "---",
                 f"# {name} Verification",
                 "",
-                f"- S-{feature_id.replace('-', '')}-001: Given valid input When submitted Then response status is 200.",
+                f"- S-{feature_id.replace('-', '')}-001: {scenario_text}",
                 f"Evidence: S-{feature_id.replace('-', '')}-001 -> TBD",
             ]
         )
