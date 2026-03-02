@@ -20,15 +20,19 @@ def run(args) -> int:
         return 1
 
     feature_id = args.feature_id
-    if not feature_id:
+    auto_generated = not feature_id
+    if auto_generated:
         feature_id = next_child_id(rows, args.parent_id) if args.parent_id else next_top_level_id(rows)
-    else:
-        if not FEATURE_ID_RE.match(feature_id):
+
+    if not FEATURE_ID_RE.match(feature_id):
+        if auto_generated:
+            print("[ERROR] Cannot auto-generate feature ID: numbering space exhausted")
+        else:
             print(f"[ERROR] Invalid feature ID format: {feature_id}")
-            return 1
-        if feature_id in existing_ids:
-            print(f"[ERROR] Feature ID already exists: {feature_id}")
-            return 1
+        return 1
+    if feature_id in existing_ids:
+        print(f"[ERROR] Feature ID already exists: {feature_id}")
+        return 1
 
     name = args.name.strip()
     status = args.status

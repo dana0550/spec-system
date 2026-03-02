@@ -19,6 +19,9 @@ RFC_KEYWORD_PATTERNS = [
     re.compile(r"\b" + re.escape(keyword) + r"\b")
     for keyword in sorted(RFC_KEYWORDS, key=len, reverse=True)
 ]
+GHERKIN_GIVEN_RE = re.compile(r"\bGIVEN\b")
+GHERKIN_WHEN_RE = re.compile(r"\bWHEN\b")
+GHERKIN_THEN_RE = re.compile(r"\bTHEN\b")
 
 
 def extract_requirement_ids(text: str) -> list[str]:
@@ -120,7 +123,12 @@ def _contains_rfc_modal(statement: str) -> bool:
 
 def _is_gherkin_shape(statement: str) -> bool:
     upper = statement.upper()
-    given = upper.find("GIVEN")
-    when = upper.find("WHEN")
-    then = upper.find("THEN")
-    return given != -1 and when != -1 and then != -1 and given < when < then
+    given_match = GHERKIN_GIVEN_RE.search(upper)
+    when_match = GHERKIN_WHEN_RE.search(upper)
+    then_match = GHERKIN_THEN_RE.search(upper)
+    return (
+        given_match is not None
+        and when_match is not None
+        and then_match is not None
+        and given_match.start() < when_match.start() < then_match.start()
+    )

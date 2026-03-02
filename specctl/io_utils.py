@@ -70,7 +70,7 @@ def dump_frontmatter(data: dict[str, Any]) -> str:
 def _parse_scalar(value: str) -> Any:
     if not value:
         return ""
-    if value.startswith(("'", '"')) and value.endswith(("'", '"')):
+    if len(value) >= 2 and value[0] in {"'", '"'} and value[0] == value[-1]:
         return value[1:-1]
     if value.startswith("[") and value.endswith("]"):
         try:
