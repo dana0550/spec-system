@@ -5,6 +5,10 @@ import shutil
 from pathlib import Path
 
 from specctl.cli import main
+from specctl.commands import check as check_command
+from specctl.commands import render as render_command
+from specctl.feature_index import read_feature_rows
+from specctl.validators.project import lint_project as real_lint_project
 
 
 def copy_fixture(tmp_path: Path, fixture_root: Path) -> Path:
@@ -87,6 +91,30 @@ def test_design_and_tasks_approvals_sync_frontmatter(tmp_path: Path) -> None:
     assert main(["approve", "--root", str(root), "--feature-id", "F-002", "--phase", "tasks"]) == 0
     _assert_feature_status(root, "F-001", "design_approved")
     _assert_feature_status(root, "F-002", "tasks_approved")
+
+
+def test_feature_name_with_pipe_roundtrips_in_features_index(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "feature",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "Login|Admin",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert rows[0].name == "Login|Admin"
+    assert rows[0].status == "requirements_draft"
 
 
 def test_feature_create_requires_existing_parent(tmp_path: Path) -> None:
@@ -302,6 +330,31 @@ def test_deprecated_status_is_allowed(tmp_path: Path) -> None:
     )
     assert main(["render", "--root", str(root)]) == 0
     assert main(["check", "--root", str(root)]) == 0
+
+
+def test_check_reuses_lint_stats_for_render(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "CheckOnce", "--owner", "owner@example.com"]) == 0
+    assert main(["render", "--root", str(root)]) == 0
+
+    calls = {"check": 0, "render": 0}
+
+    def check_lint_wrapper(path: Path):
+        calls["check"] += 1
+        return real_lint_project(path)
+
+    def render_lint_wrapper(path: Path):
+        calls["render"] += 1
+        return real_lint_project(path)
+
+    monkeypatch.setattr(check_command, "lint_project", check_lint_wrapper)
+    monkeypatch.setattr(render_command, "lint_project", render_lint_wrapper)
+
+    assert main(["check", "--root", str(root)]) == 0
+    assert calls["check"] == 1
+    assert calls["render"] == 0
 
 
 def test_done_status_with_evidence_passes_check(tmp_path: Path) -> None:

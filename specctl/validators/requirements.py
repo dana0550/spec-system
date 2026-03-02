@@ -3,14 +3,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from specctl.constants import RFC_KEYWORDS
+from specctl.constants import EARS_TRIGGERS, RFC_KEYWORDS
 from specctl.models import LintMessage
 from specctl.validators.ids import REQ_ID_RE, SCENARIO_ID_RE
 
 
 REQ_LINE_RE = re.compile(r"^\s*[-*]\s*(R-F\d{3}(?:\.\d{2})*-\d{3})\s*:\s*(.+)$")
 SCENARIO_LINE_RE = re.compile(r"^\s*[-*]\s*(S-F\d{3}(?:\.\d{2})*-\d{3})\s*:\s*(.+)$")
-EARS_TRIGGER_RE = re.compile(r"\b(?:WHENEVER|WHEN|IF|WHILE|WHERE)\b")
+EARS_TRIGGER_RE = re.compile(
+    r"\b(?:"
+    + "|".join(re.escape(trigger) for trigger in sorted(EARS_TRIGGERS, key=len, reverse=True))
+    + r")\b"
+)
 RFC_KEYWORD_PATTERNS = [
     re.compile(r"\b" + re.escape(keyword) + r"\b")
     for keyword in sorted(RFC_KEYWORDS, key=len, reverse=True)

@@ -11,6 +11,31 @@ TABLE_HEADER = "| ID | Name | Status | Parent ID | Spec Path | Owner | Aliases |
 TABLE_RULE = "|----|------|--------|-----------|-----------|-------|---------|"
 
 
+def _escape_cell(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("|", r"\|")
+
+
+def _split_row_cells(line: str) -> list[str]:
+    cells: list[str] = []
+    current: list[str] = []
+    idx = 0
+    while idx < len(line):
+        char = line[idx]
+        if char == "\\" and idx + 1 < len(line) and line[idx + 1] in {"\\", "|"}:
+            current.append(line[idx + 1])
+            idx += 2
+            continue
+        if char == "|":
+            cells.append("".join(current).strip())
+            current = []
+            idx += 1
+            continue
+        current.append(char)
+        idx += 1
+    cells.append("".join(current).strip())
+    return cells
+
+
 def read_feature_rows(path: Path) -> list[FeatureRow]:
     if not path.exists():
         return []
@@ -21,7 +46,7 @@ def read_feature_rows(path: Path) -> list[FeatureRow]:
             continue
         if line.strip() in {TABLE_HEADER, TABLE_RULE}:
             continue
-        parts = [p.strip() for p in line.strip().strip("|").split("|")]
+        parts = _split_row_cells(line.strip().strip("|"))
         if len(parts) < 7:
             continue
         if not parts[0].startswith("F-"):
@@ -54,7 +79,14 @@ def write_feature_rows(path: Path, rows: list[FeatureRow], version: str = "2.0.0
     ]
     for row in rows:
         lines.append(
-            f"| {row.feature_id} | {row.name} | {row.status} | {row.parent_id} | {row.spec_path} | {row.owner} | {row.aliases} |"
+            "| "
+            f"{_escape_cell(row.feature_id)} | "
+            f"{_escape_cell(row.name)} | "
+            f"{_escape_cell(row.status)} | "
+            f"{_escape_cell(row.parent_id)} | "
+            f"{_escape_cell(row.spec_path)} | "
+            f"{_escape_cell(row.owner)} | "
+            f"{_escape_cell(row.aliases)} |"
         )
     lines.append("")
     write_text(path, "\n".join(lines))

@@ -62,10 +62,7 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 def dump_frontmatter(data: dict[str, Any]) -> str:
     lines = ["---"]
     for key, value in data.items():
-        if isinstance(value, list):
-            lines.append(f"{key}: {value}")
-        else:
-            lines.append(f"{key}: {value}")
+        lines.append(f"{key}: {value}")
     lines.append("---")
     return "\n".join(lines) + "\n"
 

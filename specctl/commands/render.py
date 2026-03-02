@@ -4,6 +4,7 @@ from pathlib import Path
 
 from specctl.feature_index import read_feature_rows
 from specctl.io_utils import parse_frontmatter, write_text
+from specctl.models import TraceabilityStats
 from specctl.renderers.product_map import render_product_map
 from specctl.renderers.traceability import render_traceability
 from specctl.validators.project import lint_project
@@ -14,7 +15,9 @@ def run(args) -> int:
     docs = root / "docs"
     features_index_path = docs / "FEATURES.md"
     rows = read_feature_rows(features_index_path)
-    _, stats = lint_project(root)
+    stats: TraceabilityStats | None = getattr(args, "stats", None)
+    if stats is None:
+        _, stats = lint_project(root)
     render_stamp = _deterministic_render_stamp(features_index_path)
 
     product_map = render_product_map(rows).replace("last_rendered: TBD", f"last_rendered: {render_stamp}")
