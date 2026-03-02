@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs Spec System"
+  short_description: "Help with Docs Spec System tasks"
+  default_prompt: "Use $docs-spec-system to manage and propagate SSOT product docs across FEATURES.md, feature specs, and PRODUCT_MAP.md."

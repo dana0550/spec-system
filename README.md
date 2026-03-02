@@ -1,301 +1,63 @@
-# Spec System
+# docs-spec-system
 
-![Spec System Banner](spec-system-banner.png)
+This repository now distributes the `docs-spec-system` Codex Skill.
 
-A **Markdown-only product specification system** powered by OpenAI Codex (or any LLM agent) designed to keep product documentation **structured, consistent, and auto-synced** across master specs, feature specs, and product maps.
+The skill provides a Markdown-only SSOT documentation workflow for:
+- bootstrapping docs structure
+- feature lifecycle operations (add, update, rename, re-parent, deprecate)
+- requirements/acceptance criteria traceability maintenance
+- ADR creation and updates
+- docs PR preparation with a structured template
 
----
+Legacy migration and code-audit workflows are intentionally out of scope in v1.
 
-## 📖 Overview
+## Install
 
-This repository provides a **Single Source of Truth (SSOT)** for managing product documentation:
+Install from this repository path using the skill installer tooling:
 
-- **`MASTER_SPEC.md`** → product goals, principles, release scope.  
-- **`FEATURES.md`** → canonical list of features (IDs, names, hierarchy, status).  
-- **`PRODUCT_MAP.md`** → navigable tree view of the feature set.  
-- **`features/*.md`** → individual feature specs with goals, requirements, and acceptance criteria.  
-- **`DECISIONS/`** → Architecture Decision Records (ADRs).  
-- **`templates/`** → reusable templates for features and ADRs.  
-
-The system is **LLM-friendly**, using machine markers (`<!-- AUTOGEN:... -->`) so Codex or scripts can auto-update content, regenerate indices, and maintain integrity.
-
----
-
-## 🚀 Key Features
-
-- **Stable IDs, flexible names** → IDs never change; names and aliases can evolve.  
-- **Propagation rules** → updates to `FEATURES.md` cascade into maps and specs.  
-- **Autogen markers** → Codex auto-refreshes TOCs, children, references, and development checklists.  
-- **Development Status** → requirements & acceptance criteria auto-generate checklists with traceability.  
-- **Changelog support** → every file tracks changes at the bottom.  
-- **Migration + audit tooling** → `scripts/migrate_existing_project.py` inventories legacy docs, runs a code audit, and scaffolds spec files for existing products.
-
----
-
-## 🛠 How to Use
-
-This system works by giving **Codex-style instructions** that trigger updates across the entire documentation set. Below are common scenarios with clear step-by-step instructions:
-
-### 1. Bootstrapping the System
-**Scenario:** You need to add the spec system to a repo that doesn't have any of its files yet (brand-new or existing).  
-**Prep steps (run from this repository):**
-1. Dry-run the sync script to see what will be copied: `python scripts/sync_instruction_set.py <destination> --dry-run`
-2. Replace `<destination>` with the root of your project and rerun without `--dry-run` to copy the instruction set into that repo.
-   - To grab the absolute path quickly:
-     - macOS Finder: open the folder, press `⌘ + Option + C` to copy its path.
-     - Linux GNOME Files: right-click the folder and choose **Copy Location**.
-     - Windows Explorer: click the address bar and copy the full path (or Shift+Right Click → **Copy as path**).
-   - Alternatively, skip manual copying by appending `--gui` to the migration command; a folder picker will collect the path for you.
-3. (Existing repos only) Generate a migration plan and run the code audit (this also produces `MIGRATION_REPORT.md` and `CODEX_MIGRATION_PROMPT.md` in `<destination>`):
-   `python scripts/migrate_existing_project.py --source <destination> --destination <destination> --report MIGRATION_REPORT.md --apply`
-**Instruction to Codex (run inside `<destination>`):**
-```
-Bootstrap the spec system
-```
-**What happens:**
-- Codex detects the synced instruction set and scaffolds the full `docs/` folder structure in your project.  
-- Generates templates and example files.  
-- Initializes `MASTER_SPEC.md`, `FEATURES.md`, `PRODUCT_MAP.md`.  
-**Note:** If `<destination>` doesn't contain `DOCS_SYSTEM_INSTRUCTION_SET.md`, Codex cannot execute the bootstrap prompt—always run the sync script first.
-
----
-
-### 1b. Migration & Code Audit for Existing Projects
-**Goal:** Port legacy documentation and infer development progress before Codex regenerates the specs.  
-**Steps:**
-1. From this repository, run `python scripts/migrate_existing_project.py --source <legacy_repo> --destination <legacy_repo> --report MIGRATION_REPORT.md` to generate a migration plan without writing files. Add `--json` for automation workflows.
-   - Tip: reuse the path you copied above so `--source`/`--destination` point to the exact project root.
-   - Prefer an interactive selection? Run `python scripts/migrate_existing_project.py --gui --report MIGRATION_REPORT.md` and pick the repo; you can still add `--apply` or `--json` as needed.
-2. When you're comfortable with the plan, re-run with `--apply` (and optionally `--force`) so it scaffolds `docs/`, feature specs, `MIGRATION_REPORT.md`, and `CODEX_MIGRATION_PROMPT.md` inside `<legacy_repo>`.
-3. Review the generated `docs/FEATURES.md`, individual feature specs, and the audit evidence. Then open Codex in `<legacy_repo>`, paste the contents of `CODEX_MIGRATION_PROMPT.md`, and let it execute the deep migration. Finish by running `Upgrade Docs System…` to refresh AUTOGEN sections (after `Bootstrap the spec system` if you have not already triggered it).
-
-**What the script does:**
-- Scans Markdown files for feature headings or checklists, assigns stable IDs, and drafts spec stubs with summaries pulled from the original doc.
-- Performs a lightweight code audit across the repo, looking for feature name references, TODO/FIXME markers, and `deprecated` annotations to categorize work as `done`, `in_progress`, `not_started`, or `deprecated`.
-- Emits `MIGRATION_REPORT.md` that blends doc signals and code audit findings so you can reconcile discrepancies before formalizing the spec.
-- Generates `CODEX_MIGRATION_PROMPT.md`, a ready-to-paste instruction set that directs Codex to perform a thorough migration using the gathered evidence.
-
-**Flags to know:**
-- `--no-audit` skips the code scan if you only need doc extraction.  
-- `--apply` writes spec artifacts; omit it for a dry run.  
-- `--force` overwrites existing spec files (only use once you've reviewed diffs).  
-- `--report <filename>` lets you produce multiple migration snapshots.
-- `--prompt <filename>` customizes where the Codex-ready prompt is written.
-- `--gui` opens a folder picker and defaults both `--source` and `--destination` to the chosen directory.
-
-> Treat the output as a first draft: the script favors recall over precision, so you should review each generated spec and adjust statuses before publishing the docs.
-
----
-
-### Codex Deep Migration Prompt
-- Open `<legacy_repo>/CODEX_MIGRATION_PROMPT.md` and paste the enclosed block into your Codex session while rooted in that repository.
-- Approve Codex as it reconciles `MIGRATION_REPORT.md`, legacy docs, and scaffolded spec files—expect it to adjust statuses, propagate hierarchies, and populate requirements/acceptance criteria.
-- Capture any lingering questions or follow-up tasks in `MIGRATION_REPORT.md` under a new `Post-Migration` heading before finishing the session.
-
----
-
-### Post-Migration Review Checklist
-- Cross-reference `docs/FEATURES.md` with `MIGRATION_REPORT.md`; confirm lifecycle status and progress for every feature.
-- Walk each generated feature spec to replace placeholder text, migrate requirements/ACs, and add links to tickets, PRs, or tests.
-- Ensure `docs/PRODUCT_MAP.md` mirrors the hierarchy you expect customers to navigate, then regenerate backlinks if Codex did not already.
-- Review changelog updates and stage diffs; summarize notable decisions in the repo’s changelog or PR template before publishing.
-
----
-
-### 2. Adding a New Feature
-**Scenario:** You want to add a feature called *Clipboard Actions*.  
-**Instruction to Codex:**
-```
-Add a new feature "Clipboard Actions" as active
-```
-**What happens:**
-- Assigns the next available feature ID (e.g., F-007).  
-- Updates `FEATURES.md`.  
-- Creates a feature spec file from the template.  
-- Rebuilds `PRODUCT_MAP.md` and backlinks.  
-- Appends an entry to the feature’s changelog.  
-
----
-
-### 3. Adding a Sub-Feature
-**Scenario:** You want to add a sub-feature under F-001 (Voice Capture).  
-**Instruction to Codex:**
-```
-Under F-001, add sub-spec "Hotword Start" as proposed
-```
-**What happens:**
-- Creates a new ID (e.g., F-001.02).  
-- Adds the sub-spec file with its own template.  
-- Updates the parent’s *Children* section.  
-- Rebuilds `PRODUCT_MAP.md`.  
-
----
-
-### 4. Updating a Feature (Clarifications/Changes)
-**Scenario:** You need to add a new requirement and acceptance criteria.  
-**Instruction to Codex:**
-```
-Update feature "F-003":
-- Add requirement R3: "Support offline caching"
-- Add acceptance criterion AC3: "Given airplane mode, then dictation persists offline"
-```
-**What happens:**
-- Updates the feature spec.  
-- Refreshes development checklists automatically.  
-- Appends an entry to the Changelog.  
-
----
-
-### 5. Tracking Development Status
-**Scenario:** Marking progress against requirements and linking to implementation work.  
-**Instruction to Codex:**
-```
-Update feature "F-003":
-- Mark R1 complete, linked to PR #123 and Test T-045
-- Mark AC1 complete, linked to ENG-321
-```
-**What happens:**
-- Updates checkboxes in the Development Status section.  
-- Refreshes the traceability table with PRs, tests, tickets.  
-- Appends a dated changelog entry.  
-
----
-
-### 6. Recording a Decision (ADR)
-**Scenario:** You decide to use SQLite for offline caching.  
-**Instruction to Codex:**
-```
-Create ADR "Use SQLite for offline cache":
-- Context: Need lightweight storage
-- Decision: Adopt SQLite
-- Consequences: Simplifies persistence, adds dependency
-- Alternatives: Flat files, Postgres
-Link ADR to feature F-003
-```
-**What happens:**
-- Creates `DECISIONS/ADR-xxxx.md`.  
-- Links ADR in the relevant feature spec.  
-- Ensures backlinks are updated.  
-
----
-
-### ADR workflow essentials
-- **What is an ADR?** Architecture Decision Records capture consequential technical or product decisions, their context, and trade-offs. They live in `docs/DECISIONS/` and exist alongside feature specs for long-term traceability.
-- **Who creates them?** ADRs are created on demand by prompting Codex (as above) or by manually copying `docs/DECISIONS/ADR_TEMPLATE.md`. The system does not auto-generate ADRs—you must request them when a decision warrants documentation.
-- **When to write one.** Create an ADR when a change affects architecture, persistence choices, security posture, or any decision that future contributors may need to revisit. Routine tweaks or purely cosmetic tasks usually stay in issues/tickets instead.
-- **Codex workflow.** Use prompts like `Create ADR "<Decision>":` with context/decision/consequences/alternatives. Codex will fill the template, link the ADR to relevant features, and refresh backlinks. Follow up by marking the ADR in the feature spec’s Links section if additional associations arise.
-- **Maintenance.** Project maintainers decide when an ADR moves from `proposed` to `accepted` or `superseded`. When that happens, prompt Codex to update the ADR file (for example: `Update ADR "ADR-0005": mark status accepted; supersedes ADR-0002`). Codex will edit the frontmatter, adjust `supersedes`/`superseded_by`, and refresh backlinks so the decision history stays consistent.
-
----
-
-### 7. Renaming a Feature Safely
-**Scenario:** You want to rename "Formatting Engine" to "Text Formatter".  
-**Instruction to Codex:**
-```
-Rename F-002 to "Text Formatter"
-```
-**What happens:**
-- Updates the name in `FEATURES.md` (adds old name to Aliases).  
-- Renames the feature spec file.  
-- Rebuilds maps and backlinks.  
-
----
-
-### 8. Deprecating a Feature
-**Scenario:** Retiring a feature no longer in scope.  
-**Instruction to Codex:**
-```
-Deprecate feature F-004
-```
-**What happens:**
-- Marks the feature as `deprecated` in `FEATURES.md`.  
-- Adds a banner to the spec file.  
-- Removes it from active product map sections.  
-
----
-
-## 🔄 Staying Up to Date
-
-- **Instruction set versioning.** `DOCS_SYSTEM_INSTRUCTION_SET.md` now carries semantic version metadata (`MAJOR.MINOR.PATCH`) and release notes so you can see at a glance when an upgrade is available.  
-- **Codex upgrade task.** After syncing, follow the Post-Sync Upgrade Workflow (below) to run the `Upgrade Docs System` prompt so templates, backlinks, and integrity checks match the new instruction set.
-- **Changelog discipline.** Record the instruction-set upgrade in the destination repo’s changelog or ADR for traceability.  
-
----
-
-## 🧩 Syncing the Instruction Set
-
-1. **Choose the destination.** Set `<destination>` to the root folder of the repo you want to update (e.g., `../product-repo`).  
-2. **Dry-run first.** Preview the action:  
-   `python scripts/sync_instruction_set.py <destination> --dry-run`  
-3. **Apply the update.** Copy the instruction set when ready:  
-   `python scripts/sync_instruction_set.py <destination>`  
-4. **Handle edge cases.** Use optional flags when you need different behavior (see flag reference below).  
-5. **Follow-up.** Move to the Post-Sync Upgrade Workflow section and execute the listed steps to finish the migration.  
-
-**Flag reference**  
-- `--dry-run` prints the planned copy action without writing files; safe for validation.  
-- `--force` overwrites even if the destination already has the same or newer version.  
-- `--target <relative/path.md>` copies to a custom location instead of `docs/DOCS_SYSTEM_INSTRUCTION_SET.md`.  
-- `--quiet` suppresses non-error output for scripting.  
-
-> The script copies the latest instruction set when the destination is missing the file or carries an older/non-versioned copy.
-
----
-
-## ⚙️ Post-Sync Upgrade Workflow
-
-1. **Enter the destination repo.** Open a Codex session rooted in the project that just received the updated instruction set.
-2. **Run the upgrade prompt.** Ask Codex:  
-   `Upgrade Docs System to instruction set v1.2.0; confirm integrity checks pass.`  
-   (Update the version string when newer releases arrive.)
-3. **Let Codex migrate assets.** The workflow applies template changes, refreshes feature specs, rebuilds `FEATURES.md`/`PRODUCT_MAP.md`, updates backlinks, and regenerates checklists plus `MIGRATION_REPORT.md`.
-4. **Review and finalize.** Inspect the migration report and diffs, run any tests you require, then capture the changes in a commit/PR.
-
-> Codex only performs these upgrades when you explicitly request them; syncing the file alone does not update the rest of the documentation.
-
----
-
-## 📥 Opening Pull Requests with the Docs Template
-
-1. **Capture diffs.** Make sure all spec, index, and scaffold changes are staged locally after the post-sync upgrade.
-2. **Gather context.** Note every impacted feature ID, updated spec path, ADR change, and verification step.
-3. **Prompt Codex.** Ask:  
-   `Open docs PR for [F-IDs]; gather impacted features, ADRs, tests; fill PR template and create PR.`  
-   Codex should populate `.github/PULL_REQUEST_TEMPLATE.md` with concrete data (no placeholders left) and tick only the checklist items completed in this run.
-4. **Create the PR.** Use the generated body via the CLI:  
-   `gh pr create --title "docs: <summary> [F-IDs]" --template docs-system`  
-   (Drop `--template` if the file is named `PULL_REQUEST_TEMPLATE.md` at the repo root or you prefer the default template.)
-5. **Review before submitting.** Double-check the table, ADR links, verification notes, and follow-ups; add attachments such as `MIGRATION_REPORT.md` as needed.
-
-> GitHub does not auto-populate the template—Codex (or you) must replace the guidance comments before creating the pull request.
-
----
-
-## 📂 Folder Structure
-```
-docs/
-  MASTER_SPEC.md
-  FEATURES.md
-  PRODUCT_MAP.md
-  GLOSSARY.md
-  DECISIONS/
-  templates/
-  features/
+```bash
+install-skill-from-github.py --repo <owner>/<repo> --path skills/docs-spec-system
 ```
 
----
+After installation, restart Codex so the new skill is loaded.
 
-## ✅ Best Practices
+## Use
 
-- Always update `FEATURES.md` first.  
-- Never manually edit `AUTOGEN` sections.  
-- Use ADRs for architectural or design decisions.  
-- Keep changelogs concise but meaningful.  
-- Treat `status:` in `FEATURES.md` as canonical truth for lifecycle.  
-- Note the instruction-set version and rerun `Upgrade Docs System` after pulling updates.  
+Invoke with prompts such as:
 
----
+- `Use $docs-spec-system to bootstrap docs for this project.`
+- `Use $docs-spec-system to add feature "Clipboard Actions" as active.`
+- `Use $docs-spec-system to rename F-002 and deprecate F-004.`
+- `Use $docs-spec-system to prepare a docs PR for F-003 and F-007.`
 
-## 📜 License
+## Repository Layout
 
-MIT License. Free to use, modify, and adapt for your projects.
+```text
+skills/
+  docs-spec-system/
+    SKILL.md
+    agents/openai.yaml
+    references/
+      spec-system-rules.md
+      workflows.md
+      release-and-pr.md
+    assets/
+      docs-system-pr-template.md
+```
+
+## Deprecated Interfaces
+
+These script interfaces are no longer supported:
+
+- `python3 scripts/sync_instruction_set.py ...`
+- `python3 scripts/migrate_existing_project.py ...`
+
+All supported operations now flow through `$docs-spec-system`.
+
+## Local Validation
+
+Validate the skill package:
+
+```bash
+python3 /Users/dshakiba/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/docs-spec-system
+```
