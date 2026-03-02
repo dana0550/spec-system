@@ -41,6 +41,18 @@ def test_gherkin_validation_fails_without_given_when_then(tmp_path: Path) -> Non
     assert "SCENARIO_GHERKIN" in codes
 
 
+def test_gherkin_validation_uses_ordered_keywords_not_first_match(tmp_path: Path) -> None:
+    req = tmp_path / "requirements.md"
+    req.write_text(
+        "- R-F001-001: WHEN a request is valid the system MUST return success.\n"
+        "- S-F001-001: Given the THEN-processor context When submitted Then status is 200.\n",
+        encoding="utf-8",
+    )
+    messages = validate_requirements_file(req)
+    codes = {m.code for m in messages}
+    assert "SCENARIO_GHERKIN" not in codes
+
+
 def test_rfc_keyword_word_boundary_is_enforced(tmp_path: Path) -> None:
     req = tmp_path / "requirements.md"
     req.write_text(

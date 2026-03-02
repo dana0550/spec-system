@@ -123,12 +123,11 @@ def _contains_rfc_modal(statement: str) -> bool:
 
 def _is_gherkin_shape(statement: str) -> bool:
     upper = statement.upper()
-    given_match = GHERKIN_GIVEN_RE.search(upper)
-    when_match = GHERKIN_WHEN_RE.search(upper)
-    then_match = GHERKIN_THEN_RE.search(upper)
-    return (
-        given_match is not None
-        and when_match is not None
-        and then_match is not None
-        and given_match.start() < when_match.start() < then_match.start()
-    )
+    for given_match in GHERKIN_GIVEN_RE.finditer(upper):
+        when_match = GHERKIN_WHEN_RE.search(upper, given_match.end())
+        if when_match is None:
+            continue
+        then_match = GHERKIN_THEN_RE.search(upper, when_match.end())
+        if then_match is not None:
+            return True
+    return False

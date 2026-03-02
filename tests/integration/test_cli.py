@@ -243,6 +243,24 @@ def test_migrate_valid_v1_fixture(tmp_path: Path) -> None:
     assert not (backup_docs / "MASTER_SPEC.md").exists()
 
 
+def test_migrate_ignores_lowercase_requirement_like_bullets(tmp_path: Path) -> None:
+    fixture = Path("tests/fixtures/v1_docs")
+    root = copy_fixture(tmp_path, fixture)
+    old_spec = root / "docs" / "features" / "F-001-login.md"
+    old_spec.write_text(
+        old_spec.read_text(encoding="utf-8")
+        + "\n## Notes\n- r100: fallback mode.\n- ac100: any healthy response.\n",
+        encoding="utf-8",
+    )
+
+    assert main(["migrate-v1-to-v2", "--root", str(root)]) == 0
+    requirements_text = (root / "docs" / "features" / "F-001-login" / "requirements.md").read_text(
+        encoding="utf-8"
+    )
+    assert "fallback mode." not in requirements_text
+    assert "any healthy response." not in requirements_text
+
+
 def test_migrate_invalid_fixture_fails(tmp_path: Path) -> None:
     root = tmp_path / "badrepo"
     (root / "docs").mkdir(parents=True)
