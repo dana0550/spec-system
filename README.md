@@ -49,6 +49,24 @@ Migration writes backups to `.specctl-backups/migrate-<timestamp>/`.
 python -m pytest
 ```
 
+## Releases
+
+Official releases are Git tags and GitHub Releases.
+
+```bash
+git fetch origin
+git switch main
+git pull --ff-only
+git tag -a v2.0.0 -m "docs-spec-system v2.0.0"
+git push origin v2.0.0
+```
+
+Release policy:
+
+- Tag only from `main`.
+- Tag must match `pyproject.toml` project version.
+- Tag triggers `.github/workflows/release.yml`, which runs validation gates and publishes the GitHub Release.
+
 ## Repository Layout
 
 ```text

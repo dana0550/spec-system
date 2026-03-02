@@ -27,6 +27,18 @@ Blocking condition:
 - Migration path documented for users.
 - README and agent prompt are aligned with v2 command interface.
 
+## Official Release Process
+
+1. Merge approved PR into `main`.
+2. Update `pyproject.toml` version if needed.
+3. Create annotated SemVer tag from `main` (`vMAJOR.MINOR.PATCH`).
+4. Push tag to origin.
+5. GitHub Action `release.yml` validates:
+   - tag commit is on `main`
+   - tag matches `pyproject.toml` version
+   - `specctl lint`, `specctl render --check`, `specctl check`, and tests pass
+6. On pass, workflow publishes GitHub Release for the tag.
+
 ## Suggested PR Title
 
 `docs: spec system v2 update [F-IDs]`
