@@ -3,13 +3,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from specctl.constants import EARS_TRIGGERS, RFC_KEYWORDS
+from specctl.constants import RFC_KEYWORDS
 from specctl.models import LintMessage
 from specctl.validators.ids import REQ_ID_RE, SCENARIO_ID_RE
 
 
 REQ_LINE_RE = re.compile(r"^\s*[-*]\s*(R-F\d{3}(?:\.\d{2})*-\d{3})\s*:\s*(.+)$")
 SCENARIO_LINE_RE = re.compile(r"^\s*[-*]\s*(S-F\d{3}(?:\.\d{2})*-\d{3})\s*:\s*(.+)$")
+EARS_TRIGGER_RE = re.compile(r"\b(?:WHENEVER|WHEN|IF|WHILE|WHERE)\b")
+RFC_KEYWORD_PATTERNS = [
+    re.compile(r"\b" + re.escape(keyword) + r"\b")
+    for keyword in sorted(RFC_KEYWORDS, key=len, reverse=True)
+]
 
 
 def extract_requirement_ids(text: str) -> list[str]:
@@ -52,7 +57,7 @@ def validate_requirements_file(path: Path) -> list[LintMessage]:
                     )
                 )
             upper_statement = statement.upper()
-            if not any(trigger in upper_statement for trigger in EARS_TRIGGERS):
+            if not EARS_TRIGGER_RE.search(upper_statement):
                 messages.append(
                     LintMessage(
                         severity="ERROR",
@@ -103,11 +108,8 @@ def validate_requirements_file(path: Path) -> list[LintMessage]:
 
 
 def _contains_rfc_modal(statement: str) -> bool:
-    upper = statement.upper()
-    keywords = sorted(RFC_KEYWORDS, key=len, reverse=True)
-    for keyword in keywords:
-        pattern = r"\b" + re.escape(keyword) + r"\b"
-        if re.search(pattern, upper):
+    for pattern in RFC_KEYWORD_PATTERNS:
+        if pattern.search(statement):
             return True
     return False
 

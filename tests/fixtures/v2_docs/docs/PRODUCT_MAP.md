@@ -1,7 +1,7 @@
 ---
 doc_type: product_map
 from_index: ./FEATURES.md
-last_rendered: 2026-03-01
+last_rendered: 2026-03-02
 ---
 # Product Map
 

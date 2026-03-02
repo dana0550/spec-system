@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import tempfile
 from argparse import Namespace
 from pathlib import Path
 
@@ -39,15 +40,49 @@ def run(args) -> int:
     if docs.exists():
         shutil.copytree(docs, backup_dir / "docs", dirs_exist_ok=True)
 
-    docs.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="specctl-migrate-", dir=root) as tmpdir:
+        staged_root = Path(tmpdir)
+        staged_docs = staged_root / "docs"
+        if docs.exists():
+            shutil.copytree(docs, staged_docs)
+        else:
+            staged_docs.mkdir(parents=True, exist_ok=True)
+
+        migration_error = _migrate_docs(staged_docs)
+        if migration_error:
+            print(f"[ERROR] {migration_error}")
+            return 1
+
+        from specctl.commands import render
+
+        render_rc = render.run(Namespace(root=str(staged_root), check=False))
+        if render_rc != 0:
+            print("[ERROR] Migration render step failed")
+            return 1
+
+        messages, _ = lint_project(staged_root)
+        errors = [m for m in messages if m.severity == "ERROR"]
+        if errors:
+            print("[ERROR] Migration completed with blocking issues:")
+            for msg in errors:
+                print(f"- {msg.code}: {msg.message}")
+            return 1
+
+        if docs.exists():
+            shutil.rmtree(docs)
+        shutil.copytree(staged_docs, docs)
+
+    print(f"Migration complete. Backup created at {backup_dir}")
+    return 0
+
+
+def _migrate_docs(docs: Path) -> str | None:
     _ensure_base_v2_docs(docs)
 
     features_path = docs / "FEATURES.md"
     v1_feature_rows = read_feature_rows(features_path)
-
     if not v1_feature_rows:
-        print("[ERROR] No features found in docs/FEATURES.md")
-        return 1
+        return "No features found in docs/FEATURES.md"
 
     migrated_rows: list[FeatureRow] = []
     report_lines = ["# Migration Report", "", f"Date: {now_date()}", ""]
@@ -55,8 +90,7 @@ def run(args) -> int:
     for row in v1_feature_rows:
         old_spec = docs / row.spec_path
         if not old_spec.exists():
-            print(f"[ERROR] Missing v1 spec file: {old_spec}")
-            return 1
+            return f"Missing v1 spec file: {old_spec}"
 
         feature_slug = f"{row.feature_id}-{slugify(row.name)}"
         feature_dir = docs / "features" / feature_slug
@@ -191,20 +225,7 @@ def run(args) -> int:
 
     write_feature_rows(features_path, migrated_rows)
     write_text(docs / "MIGRATION_REPORT.md", "\n".join(report_lines) + "\n")
-    from specctl.commands import render
-
-    render.run(Namespace(root=str(root), check=False))
-
-    messages, _ = lint_project(root)
-    errors = [m for m in messages if m.severity == "ERROR"]
-    if errors:
-        print("[ERROR] Migration completed with blocking issues:")
-        for msg in errors:
-            print(f"- {msg.code}: {msg.message}")
-        return 1
-
-    print(f"Migration complete. Backup created at {backup_dir}")
-    return 0
+    return None
 
 
 def _ensure_base_v2_docs(docs: Path) -> None:

@@ -34,6 +34,7 @@ jobs:
           tmpdir="$(mktemp -d)"
           python -m specctl.cli init --root "$tmpdir"
           python -m specctl.cli feature create --root "$tmpdir" --name "SmokeFeature" --owner smoke@example.com
+          python -m specctl.cli render --root "$tmpdir"
           python -m specctl.cli check --root "$tmpdir"
 
       - name: Migration smoke

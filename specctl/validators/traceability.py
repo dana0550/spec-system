@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from specctl.models import LintMessage, TraceabilityStats
 from specctl.validators.requirements import extract_requirement_ids, extract_scenario_ids
+
+EVIDENCE_LINE_RE = re.compile(r"^\s*Evidence:\s*(S-F\d{3}(?:\.\d{2})*-\d{3})\b", re.MULTILINE)
 
 
 def validate_feature_traceability(feature_dir: Path) -> tuple[list[LintMessage], TraceabilityStats]:
@@ -36,12 +39,15 @@ def validate_feature_traceability(feature_dir: Path) -> tuple[list[LintMessage],
 
     req_ids = sorted(set(extract_requirement_ids(req_text)))
     scenario_ids = sorted(set(extract_scenario_ids(req_text) + extract_scenario_ids(verification_text)))
+    design_req_ids = set(extract_requirement_ids(design_text))
+    task_req_ids = set(extract_requirement_ids(tasks_text))
+    evidence_ids = set(EVIDENCE_LINE_RE.findall(verification_text))
 
     stats.requirements_total += len(req_ids)
     stats.scenarios_total += len(scenario_ids)
 
     for req_id in req_ids:
-        if req_id in design_text:
+        if req_id in design_req_ids:
             stats.requirements_with_design += 1
         else:
             messages.append(
@@ -50,10 +56,10 @@ def validate_feature_traceability(feature_dir: Path) -> tuple[list[LintMessage],
                     code="TRACE_DESIGN_MISSING",
                     message=f"Requirement {req_id} missing from design.md",
                     path=design_path,
+                    )
                 )
-            )
 
-        if req_id in tasks_text:
+        if req_id in task_req_ids:
             stats.requirements_with_tasks += 1
         else:
             messages.append(
@@ -66,15 +72,14 @@ def validate_feature_traceability(feature_dir: Path) -> tuple[list[LintMessage],
             )
 
     for scenario_id in scenario_ids:
-        marker = f"Evidence: {scenario_id}"
-        if marker in verification_text:
+        if scenario_id in evidence_ids:
             stats.scenarios_with_evidence += 1
         else:
             messages.append(
                 LintMessage(
                     severity="ERROR",
                     code="TRACE_EVIDENCE_MISSING",
-                    message=f"Scenario {scenario_id} is missing evidence marker '{marker}'",
+                    message=f"Scenario {scenario_id} is missing evidence marker 'Evidence: {scenario_id}'",
                     path=verification_path,
                 )
             )

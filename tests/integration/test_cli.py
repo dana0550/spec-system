@@ -110,6 +110,68 @@ def test_feature_create_requires_existing_parent(tmp_path: Path) -> None:
     )
 
 
+def test_feature_create_rejects_invalid_status_and_feature_id(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "feature",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "InvalidStatus",
+                "--status",
+                "totally_invalid",
+            ]
+        )
+        == 1
+    )
+    assert (
+        main(
+            [
+                "feature",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "InvalidId",
+                "--feature-id",
+                "bad-id",
+            ]
+        )
+        == 1
+    )
+
+
+def test_approve_fails_when_required_feature_files_are_missing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "feature",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ApprovalGuard",
+                "--status",
+                "requirements_draft",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
+    feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    (feature_dir / "design.md").unlink()
+    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "requirements"]) == 1
+
+
 def test_migrate_valid_v1_fixture(tmp_path: Path) -> None:
     fixture = Path("tests/fixtures/v1_docs")
     root = copy_fixture(tmp_path, fixture)
@@ -136,6 +198,9 @@ def test_migrate_invalid_fixture_fails(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert main(["migrate-v1-to-v2", "--root", str(root)]) == 1
+    assert not (root / "docs" / "MASTER_SPEC.md").exists()
+    assert not (root / "docs" / "PRODUCT_MAP.md").exists()
+    assert not (root / "docs" / "TRACEABILITY.md").exists()
 
 
 def test_render_is_deterministic(tmp_path: Path) -> None:
@@ -147,6 +212,71 @@ def test_render_is_deterministic(tmp_path: Path) -> None:
     assert main(["render", "--root", str(root)]) == 0
     assert (root / "docs" / "PRODUCT_MAP.md").read_text(encoding="utf-8") == first_product_map
     assert (root / "docs" / "TRACEABILITY.md").read_text(encoding="utf-8") == first_traceability
+
+
+def test_render_uses_features_last_synced_stamp(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "Stamped", "--owner", "owner@example.com"]) == 0
+    features_path = root / "docs" / "FEATURES.md"
+    text = features_path.read_text(encoding="utf-8")
+    text = re.sub(r"^last_synced: .*$", "last_synced: 2001-02-03", text, flags=re.MULTILINE)
+    features_path.write_text(text, encoding="utf-8")
+
+    assert main(["render", "--root", str(root)]) == 0
+    product_map_text = (root / "docs" / "PRODUCT_MAP.md").read_text(encoding="utf-8")
+    traceability_text = (root / "docs" / "TRACEABILITY.md").read_text(encoding="utf-8")
+    assert "last_rendered: 2001-02-03" in product_map_text
+    assert "last_rendered: 2001-02-03" in traceability_text
+    assert main(["render", "--root", str(root), "--check"]) == 0
+
+
+def test_hierarchy_cycle_is_rejected(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "FeatureA", "--owner", "owner@example.com"]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "FeatureB", "--owner", "owner@example.com"]) == 0
+
+    features_path = root / "docs" / "FEATURES.md"
+    text = features_path.read_text(encoding="utf-8")
+    text = text.replace("| F-001 | FeatureA | requirements_draft |  |", "| F-001 | FeatureA | requirements_draft | F-002 |")
+    text = text.replace("| F-002 | FeatureB | requirements_draft |  |", "| F-002 | FeatureB | requirements_draft | F-001 |")
+    features_path.write_text(text, encoding="utf-8")
+
+    assert main(["lint", "--root", str(root)]) == 1
+
+
+def test_traceability_checks_use_exact_requirement_ids(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "TraceExact", "--owner", "owner@example.com"]) == 0
+    feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    (feature_dir / "design.md").write_text(
+        "---\n"
+        "doc_type: feature_design\n"
+        "feature_id: F-001\n"
+        "status: requirements_draft\n"
+        "last_updated: 2026-03-01\n"
+        "---\n"
+        "# TraceExact Design\n\n"
+        "- D-F001-010: Implements R-F001-0010\n",
+        encoding="utf-8",
+    )
+    (feature_dir / "tasks.md").write_text(
+        "---\n"
+        "doc_type: feature_tasks\n"
+        "feature_id: F-001\n"
+        "status: requirements_draft\n"
+        "last_updated: 2026-03-01\n"
+        "---\n"
+        "# TraceExact Tasks\n\n"
+        "- [ ] T-F001-010 Implement requirement (R: R-F001-0010, D: D-F001-010)\n",
+        encoding="utf-8",
+    )
+    assert main(["lint", "--root", str(root)]) == 1
 
 
 def test_deprecated_status_is_allowed(tmp_path: Path) -> None:

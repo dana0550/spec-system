@@ -5,8 +5,8 @@ import re
 from specctl.models import FeatureRow, LintMessage
 
 FEATURE_ID_RE = re.compile(r"^F-\d{3}(?:\.\d{2})*$")
-REQ_ID_RE = re.compile(r"R-F\d{3}(?:\.\d{2})*-\d{3}")
-SCENARIO_ID_RE = re.compile(r"S-F\d{3}(?:\.\d{2})*-\d{3}")
+REQ_ID_RE = re.compile(r"\bR-F\d{3}(?:\.\d{2})*-\d{3}\b")
+SCENARIO_ID_RE = re.compile(r"\bS-F\d{3}(?:\.\d{2})*-\d{3}\b")
 
 
 def validate_feature_ids(rows: list[FeatureRow]) -> list[LintMessage]:

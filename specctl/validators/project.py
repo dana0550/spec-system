@@ -4,7 +4,7 @@ from pathlib import Path
 
 from specctl.constants import REQUIRED_DOC_FILES
 from specctl.feature_index import read_feature_rows
-from specctl.models import LintMessage, TraceabilityStats
+from specctl.models import FeatureRow, LintMessage, TraceabilityStats
 from specctl.validators.ids import validate_feature_ids
 from specctl.validators.lifecycle import validate_statuses
 from specctl.validators.requirements import validate_requirements_file
@@ -66,6 +66,7 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats]:
                         path=features_index_path,
                     )
                 )
+        messages.extend(validate_feature_hierarchy(rows, features_index_path))
 
     features_root = docs_dir / "features"
     if not features_root.exists():
@@ -117,3 +118,78 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats]:
             )
 
     return messages, stats
+
+
+def validate_feature_hierarchy(rows: list[FeatureRow], features_index_path: Path) -> list[LintMessage]:
+    messages: list[LintMessage] = []
+    if not rows:
+        return messages
+
+    row_ids = {row.feature_id for row in rows}
+    children_by_parent: dict[str, set[str]] = {}
+    parent_by_id = {row.feature_id: row.parent_id for row in rows}
+    for row in rows:
+        children_by_parent.setdefault(row.parent_id, set()).add(row.feature_id)
+
+    roots = sorted(fid for fid, parent in parent_by_id.items() if parent == "")
+    if not roots:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="HIERARCHY_NO_ROOT",
+                message="No top-level feature roots found (rows with empty parent ID)",
+                path=features_index_path,
+            )
+        )
+
+    reachable: set[str] = set()
+    stack = list(roots)
+    while stack:
+        node = stack.pop()
+        if node in reachable:
+            continue
+        reachable.add(node)
+        stack.extend(sorted(children_by_parent.get(node, set())))
+
+    for feature_id in sorted(row_ids - reachable):
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="HIERARCHY_UNREACHABLE",
+                message=f"Feature {feature_id} is not reachable from any top-level root",
+                path=features_index_path,
+            )
+        )
+
+    cycle_keys: set[tuple[str, ...]] = set()
+    for feature_id in sorted(row_ids):
+        seen_chain: list[str] = []
+        seen_set: set[str] = set()
+        cursor = feature_id
+        while cursor in row_ids and cursor not in seen_set:
+            seen_chain.append(cursor)
+            seen_set.add(cursor)
+            parent = parent_by_id.get(cursor, "")
+            if parent == "" or parent not in row_ids:
+                cursor = ""
+                break
+            cursor = parent
+        if cursor and cursor in seen_set:
+            cycle_start = seen_chain.index(cursor)
+            cycle = seen_chain[cycle_start:] + [cursor]
+            cycle_loop = cycle[:-1]
+            rotations = [tuple(cycle_loop[i:] + cycle_loop[:i]) for i in range(len(cycle_loop))]
+            cycle_key = min(rotations)
+            if cycle_key in cycle_keys:
+                continue
+            cycle_keys.add(cycle_key)
+            messages.append(
+                LintMessage(
+                    severity="ERROR",
+                    code="HIERARCHY_CYCLE",
+                    message=f"Hierarchy cycle detected: {' -> '.join(cycle_key + (cycle_key[0],))}",
+                    path=features_index_path,
+                )
+            )
+
+    return messages

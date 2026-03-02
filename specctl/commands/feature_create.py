@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from specctl.constants import FEATURE_STATUSES
 from specctl.feature_index import FeatureRow, next_child_id, next_top_level_id, read_feature_rows, write_feature_rows
 from specctl.io_utils import now_date, slugify, write_text
+from specctl.validators.ids import FEATURE_ID_RE
 
 
 def run(args) -> int:
@@ -20,12 +22,19 @@ def run(args) -> int:
     feature_id = args.feature_id
     if not feature_id:
         feature_id = next_child_id(rows, args.parent_id) if args.parent_id else next_top_level_id(rows)
-    elif feature_id in existing_ids:
-        print(f"[ERROR] Feature ID already exists: {feature_id}")
-        return 1
+    else:
+        if not FEATURE_ID_RE.match(feature_id):
+            print(f"[ERROR] Invalid feature ID format: {feature_id}")
+            return 1
+        if feature_id in existing_ids:
+            print(f"[ERROR] Feature ID already exists: {feature_id}")
+            return 1
 
     name = args.name.strip()
     status = args.status
+    if status not in FEATURE_STATUSES:
+        print(f"[ERROR] Invalid lifecycle status '{status}'")
+        return 1
     slug = f"{feature_id}-{slugify(name)}"
     spec_path = f"features/{slug}/requirements.md"
 

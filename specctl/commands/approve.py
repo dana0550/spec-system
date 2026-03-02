@@ -21,6 +21,11 @@ def run(args) -> int:
     for row in rows:
         if row.feature_id != args.feature_id:
             continue
+        missing_files = _missing_feature_files(root, row.spec_path)
+        if missing_files:
+            for path in missing_files:
+                print(f"[ERROR] Missing required feature file for approval: {path}")
+            return 1
         if row.status != expected_from:
             print(
                 f"[ERROR] Transition blocked for {row.feature_id}: expected '{expected_from}', found '{row.status}'"
@@ -34,6 +39,13 @@ def run(args) -> int:
 
     print(f"[ERROR] Feature ID not found: {args.feature_id}")
     return 1
+
+
+def _missing_feature_files(root: Path, spec_path: str) -> list[Path]:
+    requirements_path = root / "docs" / spec_path
+    feature_dir = requirements_path.parent
+    required = [feature_dir / filename for filename in ["requirements.md", "design.md", "tasks.md", "verification.md"]]
+    return [path for path in required if not path.exists()]
 
 
 def _sync_feature_status(root: Path, spec_path: str, status: str) -> None:
