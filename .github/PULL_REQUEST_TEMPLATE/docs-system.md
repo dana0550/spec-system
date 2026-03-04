@@ -7,6 +7,9 @@ title: "docs: <concise change summary> [F-XXX,…]"
 ## Summary
 - 
 
+## Auto-Merge
+- [ ] Disable default auto-merge for this PR
+
 ## Scope
 - In-scope:
 - Out-of-scope:

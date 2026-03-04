@@ -1,0 +1,52 @@
+name: Auto Merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+      - labeled
+      - unlabeled
+  pull_request_review_thread:
+    types:
+      - resolved
+      - unresolved
+  check_run:
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+jobs:
+  auto-merge-controller:
+    # Prevent this workflow's own check_run completion from re-triggering itself forever.
+    if: github.event_name != 'check_run' || github.event.check_run.name != 'auto-merge-controller'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Evaluate PR gates and merge when ready
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          AUTO_MERGE_DISABLE_LABEL: automerge:off
+          AUTO_MERGE_DISABLE_CHECKBOX: Disable default auto-merge for this PR
+          AUTO_MERGE_IGNORE_CHECK_PREFIXES: Auto Merge /
+          AUTO_MERGE_BUGBOT_CHECK_KEYWORDS: bugbot,cursor
+          AUTO_MERGE_BUGBOT_LOGINS: cursor[bot],cursor-agent[bot],bugbot[bot]
+          AUTO_MERGE_METHOD: merge
+        run: python .github/scripts/auto_merge.py

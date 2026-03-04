@@ -68,6 +68,23 @@ Release policy:
 - Tag triggers `.github/workflows/release.yml`, which runs validation gates and publishes the GitHub Release.
 - `.github/workflows/auto-tag-from-main.yml` automatically creates the version tag after merges to `main` when the tag does not already exist.
 
+## Pull Request Auto-Merge
+
+This repository defaults pull requests to auto-merge behavior via `.github/workflows/auto-merge.yml`.
+
+Merge happens only when:
+
+- Every check/status on the PR head commit is green.
+- A bugbot check has completed successfully.
+- Cursor bugbot has no unresolved review threads.
+
+Human review is not required by this workflow.
+
+Per-PR opt-out is available using either:
+
+- PR template toggle: `- [x] Disable default auto-merge for this PR`
+- Label override: `automerge:off`
+
 ## Repository Layout
 
 ```text
