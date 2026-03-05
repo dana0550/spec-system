@@ -35,6 +35,7 @@ def run(args) -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     write_text(run_dir / "blockers.md", empty_blocker_ledger())
     write_text(run_dir / "summary.md", "# Run Summary\n\n")
+    write_text(run_dir / "events.jsonl", "")
 
     runner = args.runner or contract.get("runner", "codex")
     state = {

@@ -703,6 +703,42 @@ def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path:
     assert "B-E001-" not in blockers
 
 
+def test_oneshot_run_precreates_events_log_when_no_checkpoint_executes(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "NoProgressFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["checkpoint_graph"][0]["depends_on"] = ["C-E001-999"]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    events_path = run_dir / "events.jsonl"
+    assert events_path.exists()
+    assert events_path.read_text(encoding="utf-8") == ""
+
+
 def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
