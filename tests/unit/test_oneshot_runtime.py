@@ -143,3 +143,14 @@ def test_scan_placeholder_markers_captures_full_blocker_id_suffix(tmp_path: Path
     assert hits[0][0] == marker_file
     assert hits[0][1] == 1
     assert hits[0][2] == "B-E001-1000"
+
+
+def test_scan_placeholder_markers_ignores_prefix_without_blocker_id(tmp_path: Path) -> None:
+    marker_file = tmp_path / "marker.txt"
+    marker_file.write_text(
+        "Format: ONESHOT-BLOCKER:<blocker-id>\n"
+        "Example prefix only ONESHOT-BLOCKER:\n",
+        encoding="utf-8",
+    )
+    hits = scan_placeholder_markers(tmp_path)
+    assert hits == []

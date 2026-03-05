@@ -309,8 +309,9 @@ def scan_placeholder_markers(root: Path, exclude_prefixes: list[Path] | None = N
             for idx, line in enumerate(text.splitlines(), start=1):
                 if ONESHOT_PLACEHOLDER_PREFIX in line:
                     match = PLACEHOLDER_RE.search(line)
-                    marker = match.group(1) if match else ""
-                    hits.append((path, idx, marker))
+                    if not match:
+                        continue
+                    hits.append((path, idx, match.group(1)))
     return hits
 
 
