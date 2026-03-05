@@ -108,15 +108,23 @@ def run(args) -> int:
             print(format_message(message))
         return 1
 
-    rollback_contents: dict[Path, str] = {}
+    rollback_contents: dict[Path, str | None] = {}
 
     def _snapshot(path: Path) -> None:
-        if path.exists() and path not in rollback_contents:
+        if path in rollback_contents:
+            return
+        if path.exists():
             rollback_contents[path] = path.read_text(encoding="utf-8")
+        else:
+            rollback_contents[path] = None
 
     def _rollback() -> None:
         for path, original_text in rollback_contents.items():
-            write_text(path, original_text)
+            if original_text is None:
+                if path.exists():
+                    path.unlink()
+            else:
+                write_text(path, original_text)
 
     scope_set = set(contract.get("scope_feature_ids", []))
     try:
@@ -144,6 +152,11 @@ def run(args) -> int:
         if brief_path.exists():
             _snapshot(brief_path)
             set_frontmatter_value(brief_path, "status", "done")
+
+        product_map_path = root / "docs" / "PRODUCT_MAP.md"
+        traceability_path = root / "docs" / "TRACEABILITY.md"
+        _snapshot(product_map_path)
+        _snapshot(traceability_path)
 
         render_rc = render.run(Namespace(root=str(root), check=False))
         if render_rc != 0:

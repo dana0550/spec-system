@@ -10,6 +10,7 @@ import yaml
 from specctl.cli import main
 from specctl.commands import check as check_command
 from specctl.commands import epic_create as epic_create_command
+from specctl.commands import oneshot_finalize as oneshot_finalize_command
 from specctl.commands import render as render_command
 from specctl.feature_index import read_feature_rows
 from specctl.oneshot_utils import parse_blockers
@@ -812,6 +813,60 @@ def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
     blockers = (run_dir / "blockers.md").read_text(encoding="utf-8")
     assert "B-E001-001" in blockers
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+
+def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "RenderRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    product_map_path = root / "docs" / "PRODUCT_MAP.md"
+    traceability_path = root / "docs" / "TRACEABILITY.md"
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+
+    product_map_before = product_map_path.read_text(encoding="utf-8")
+    traceability_before = traceability_path.read_text(encoding="utf-8")
+    features_before = features_path.read_text(encoding="utf-8")
+    epics_before = epics_path.read_text(encoding="utf-8")
+
+    def failing_render(args):
+        docs_dir = Path(args.root) / "docs"
+        (docs_dir / "PRODUCT_MAP.md").write_text("CORRUPTED PRODUCT MAP\n", encoding="utf-8")
+        (docs_dir / "TRACEABILITY.md").write_text("CORRUPTED TRACEABILITY\n", encoding="utf-8")
+        return 1
+
+    monkeypatch.setattr(oneshot_finalize_command.render, "run", failing_render)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    assert product_map_path.read_text(encoding="utf-8") == product_map_before
+    assert traceability_path.read_text(encoding="utf-8") == traceability_before
+    assert features_path.read_text(encoding="utf-8") == features_before
+    assert epics_path.read_text(encoding="utf-8") == epics_before
 
 
 def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path) -> None:
