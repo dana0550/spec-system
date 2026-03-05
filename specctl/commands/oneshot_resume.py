@@ -12,7 +12,7 @@ from specctl.commands.oneshot_common import (
 from specctl.commands.oneshot_run import _build_scoped_prompt, _is_repo_integrity_failure, _run_validation_group, _write_summary
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import write_text
-from specctl.oneshot_utils import append_blocker, blocker_id, parse_blockers, write_memory_files
+from specctl.oneshot_utils import append_blocker, blocker_id, parse_blockers, resolve_blockers_for_checkpoint, write_memory_files
 
 
 def run(args) -> int:
@@ -131,6 +131,7 @@ def run(args) -> int:
             )
 
         if success:
+            resolve_blockers_for_checkpoint(run_dir / "blockers.md", checkpoint_id)
             state["checkpoint_status"][checkpoint_id] = "passed"
             continue
 

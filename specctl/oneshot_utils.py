@@ -148,6 +148,30 @@ def append_blocker(path: Path, row: dict[str, str]) -> None:
         handle.write(line + "\n")
 
 
+def resolve_blockers_for_checkpoint(path: Path, checkpoint_id: str) -> int:
+    if not path.exists():
+        return 0
+
+    updated = 0
+    rewritten_lines: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        rewritten = line
+        if line.startswith("|"):
+            stripped = line.strip()
+            if stripped not in {BLOCKER_HEADER, BLOCKER_RULE}:
+                cols = split_markdown_table_row(stripped.strip("|"))
+                if len(cols) == 10 and cols[0].startswith("B-"):
+                    if cols[1] == checkpoint_id and cols[9] == "open":
+                        cols[9] = "resolved"
+                        updated += 1
+                    rewritten = f"| {' | '.join(escape_markdown_table_cell(col) for col in cols)} |"
+        rewritten_lines.append(rewritten)
+
+    if updated:
+        write_text(path, "\n".join(rewritten_lines) + "\n")
+    return updated
+
+
 def collect_run_stats(runs_dir: Path) -> dict[str, int]:
     totals = {
         "runs_total": 0,

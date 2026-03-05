@@ -12,6 +12,7 @@ from specctl.commands import check as check_command
 from specctl.commands import epic_create as epic_create_command
 from specctl.commands import render as render_command
 from specctl.feature_index import read_feature_rows
+from specctl.oneshot_utils import parse_blockers
 from specctl.validators.project import lint_project as real_lint_project
 
 
@@ -775,3 +776,48 @@ def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
     blockers = (run_dir / "blockers.md").read_text(encoding="utf-8")
     assert "B-E001-001" in blockers
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+
+def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeResolveBlockerFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    payload["validation_commands"] = ["true"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+    blockers = parse_blockers(run_dir / "blockers.md")
+    assert blockers
+    assert all(row["status"] != "open" for row in blockers)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
