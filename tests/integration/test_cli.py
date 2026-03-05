@@ -967,6 +967,46 @@ def test_oneshot_finalize_rolls_back_when_run_state_is_invalid(tmp_path: Path) -
     assert requirements_path.read_text(encoding="utf-8") == requirements_before
 
 
+def test_oneshot_finalize_passes_precomputed_stats_to_render(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeStatsFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    captured = {"has_stats": False}
+
+    def render_with_stats(args):
+        captured["has_stats"] = hasattr(args, "stats") and args.stats is not None
+        return 0
+
+    monkeypatch.setattr(oneshot_finalize_command.render, "run", render_with_stats)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    assert captured["has_stats"] is True
+
+
 def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()

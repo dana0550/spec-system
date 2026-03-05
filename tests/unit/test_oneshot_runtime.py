@@ -5,7 +5,7 @@ from pathlib import Path
 
 from specctl.commands.oneshot_common import run_shell
 from specctl.commands.oneshot_run import _is_repo_integrity_failure, _run_validation_group
-from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, scan_placeholder_markers
+from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, parse_task_ids, scan_placeholder_markers
 from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
 
@@ -154,3 +154,17 @@ def test_scan_placeholder_markers_ignores_prefix_without_blocker_id(tmp_path: Pa
     )
     hits = scan_placeholder_markers(tmp_path)
     assert hits == []
+
+
+def test_parse_task_ids_accepts_variable_width_suffix() -> None:
+    text = "\n".join(
+        [
+            "- [ ] T-F001-001 Implement baseline task",
+            "- [ ] T-F001-1000 Implement long suffix task",
+            "- [ ] T-F001.01-1001 Implement nested long suffix task",
+        ]
+    )
+    ids = parse_task_ids(text)
+    assert "T-F001-001" in ids
+    assert "T-F001-1000" in ids
+    assert "T-F001.01-1001" in ids

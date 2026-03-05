@@ -316,4 +316,4 @@ def scan_placeholder_markers(root: Path, exclude_prefixes: list[Path] | None = N
 
 
 def parse_task_ids(text: str) -> list[str]:
-    return re.findall(r"\bT-F\d{3}(?:\.\d{2})*-\d{3}\b", text)
+    return re.findall(r"\bT-F\d{3}(?:\.\d{2})*-\d{3,}\b", text)
