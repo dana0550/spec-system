@@ -26,7 +26,7 @@ BLOCKER_HEADER = (
     "Placeholder Marker | Owner | Exit Criteria | Status |"
 )
 BLOCKER_RULE = "|---|---|---|---|---|---|---|---|---|---|"
-PLACEHOLDER_RE = re.compile(rf"{re.escape(ONESHOT_PLACEHOLDER_PREFIX)}(B-E\d{{3}}-\d{{3}})")
+PLACEHOLDER_RE = re.compile(rf"{re.escape(ONESHOT_PLACEHOLDER_PREFIX)}(B-E\d{{3}}-\d{{3,}})")
 PLACEHOLDER_SCAN_EXCLUDED_DIRS = {
     ".git",
     ".hg",

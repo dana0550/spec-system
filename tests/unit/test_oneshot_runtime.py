@@ -5,7 +5,7 @@ from pathlib import Path
 
 from specctl.commands.oneshot_common import run_shell
 from specctl.commands.oneshot_run import _is_repo_integrity_failure, _run_validation_group
-from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers
+from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, scan_placeholder_markers
 from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
 
@@ -133,3 +133,13 @@ def test_oneshot_id_regex_allows_suffixes_with_more_than_three_digits() -> None:
     assert CHECKPOINT_ID_RE.match("C-E001-1000")
     assert BLOCKER_ID_RE.match("B-E001-001")
     assert BLOCKER_ID_RE.match("B-E001-1000")
+
+
+def test_scan_placeholder_markers_captures_full_blocker_id_suffix(tmp_path: Path) -> None:
+    marker_file = tmp_path / "marker.txt"
+    marker_file.write_text("TODO ONESHOT-BLOCKER:B-E001-1000\n", encoding="utf-8")
+    hits = scan_placeholder_markers(tmp_path)
+    assert len(hits) == 1
+    assert hits[0][0] == marker_file
+    assert hits[0][1] == 1
+    assert hits[0][2] == "B-E001-1000"
