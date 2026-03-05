@@ -3,37 +3,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from specctl.io_utils import now_date, read_text, write_text
+from specctl.io_utils import escape_markdown_table_cell, now_date, read_text, split_markdown_table_row, write_text
 from specctl.models import EpicRow
 
 
 TABLE_HEADER = "| ID | Name | Status | Root Feature ID | Epic Path | Owner | Aliases |"
 TABLE_RULE = "|----|------|--------|-----------------|-----------|-------|---------|"
-
-
-def _escape_cell(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("|", r"\|")
-
-
-def _split_row_cells(line: str) -> list[str]:
-    cells: list[str] = []
-    current: list[str] = []
-    idx = 0
-    while idx < len(line):
-        char = line[idx]
-        if char == "\\" and idx + 1 < len(line) and line[idx + 1] in {"\\", "|"}:
-            current.append(line[idx + 1])
-            idx += 2
-            continue
-        if char == "|":
-            cells.append("".join(current).strip())
-            current = []
-            idx += 1
-            continue
-        current.append(char)
-        idx += 1
-    cells.append("".join(current).strip())
-    return cells
 
 
 def read_epic_rows(path: Path) -> list[EpicRow]:
@@ -46,7 +21,7 @@ def read_epic_rows(path: Path) -> list[EpicRow]:
             continue
         if line.strip() in {TABLE_HEADER, TABLE_RULE}:
             continue
-        parts = _split_row_cells(line.strip().strip("|"))
+        parts = split_markdown_table_row(line.strip().strip("|"))
         if len(parts) < 7:
             continue
         if not parts[0].startswith("E-"):
@@ -80,13 +55,13 @@ def write_epic_rows(path: Path, rows: list[EpicRow], version: str = "2.1.0") -> 
     for row in rows:
         lines.append(
             "| "
-            f"{_escape_cell(row.epic_id)} | "
-            f"{_escape_cell(row.name)} | "
-            f"{_escape_cell(row.status)} | "
-            f"{_escape_cell(row.root_feature_id)} | "
-            f"{_escape_cell(row.epic_path)} | "
-            f"{_escape_cell(row.owner)} | "
-            f"{_escape_cell(row.aliases)} |"
+            f"{escape_markdown_table_cell(row.epic_id)} | "
+            f"{escape_markdown_table_cell(row.name)} | "
+            f"{escape_markdown_table_cell(row.status)} | "
+            f"{escape_markdown_table_cell(row.root_feature_id)} | "
+            f"{escape_markdown_table_cell(row.epic_path)} | "
+            f"{escape_markdown_table_cell(row.owner)} | "
+            f"{escape_markdown_table_cell(row.aliases)} |"
         )
     lines.append("")
     write_text(path, "\n".join(lines))

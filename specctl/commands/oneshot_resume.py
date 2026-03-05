@@ -90,7 +90,9 @@ def run(args) -> int:
         validation_commands = checkpoint.get("validation_commands", contract.get("validation_commands", []))
         if not isinstance(validation_commands, list):
             validation_commands = []
-        success = _run_validation_group(run_dir, root, checkpoint_id, validation_commands, phase="resume")
+        success, failed_validation_commands = _run_validation_group(
+            run_dir, root, checkpoint_id, validation_commands, phase="resume"
+        )
         retry_count = 0
         while not success and retry_count < max_retries:
             retry_count += 1
@@ -107,7 +109,9 @@ def run(args) -> int:
                         "output": output[-2000:],
                     },
                 )
-            success = _run_validation_group(run_dir, root, checkpoint_id, validation_commands, phase="resume-retry")
+            success, failed_validation_commands = _run_validation_group(
+                run_dir, root, checkpoint_id, validation_commands, phase="resume-retry"
+            )
 
         if success:
             state["checkpoint_status"][checkpoint_id] = "passed"
@@ -134,7 +138,7 @@ def run(args) -> int:
                 "status": "open",
             },
         )
-        if blocker_type in hard_stop_types or _is_repo_integrity_failure(validation_commands):
+        if blocker_type in hard_stop_types or _is_repo_integrity_failure(failed_validation_commands):
             state["checkpoint_status"][checkpoint_id] = "failed_terminal"
             state["status"] = "blocked"
             break

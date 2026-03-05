@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
-from specctl.io_utils import now_date, now_timestamp, write_text
+from specctl.io_utils import escape_markdown_table_cell, now_date, now_timestamp, split_markdown_table_row, write_text
 
 
 REQUIRED_BRIEF_SECTIONS = ["Vision", "Outcomes", "User Journeys", "Constraints", "Non-Goals"]
@@ -96,31 +96,6 @@ def empty_blocker_ledger() -> str:
     return "\n".join(["# Blockers Ledger", "", BLOCKER_HEADER, BLOCKER_RULE, ""]) + "\n"
 
 
-def _escape_cell(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("|", r"\|")
-
-
-def _split_row_cells(line: str) -> list[str]:
-    cells: list[str] = []
-    current: list[str] = []
-    idx = 0
-    while idx < len(line):
-        char = line[idx]
-        if char == "\\" and idx + 1 < len(line) and line[idx + 1] in {"\\", "|"}:
-            current.append(line[idx + 1])
-            idx += 2
-            continue
-        if char == "|":
-            cells.append("".join(current).strip())
-            current = []
-            idx += 1
-            continue
-        current.append(char)
-        idx += 1
-    cells.append("".join(current).strip())
-    return cells
-
-
 def parse_blockers(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
@@ -130,7 +105,7 @@ def parse_blockers(path: Path) -> list[dict[str, str]]:
             continue
         if line.strip() in {BLOCKER_HEADER, BLOCKER_RULE}:
             continue
-        cols = _split_row_cells(line.strip().strip("|"))
+        cols = split_markdown_table_row(line.strip().strip("|"))
         if len(cols) != 10 or not cols[0].startswith("B-"):
             continue
         rows.append(
@@ -154,10 +129,10 @@ def append_blocker(path: Path, row: dict[str, str]) -> None:
     if not path.exists():
         write_text(path, empty_blocker_ledger())
     line = (
-        f"| {_escape_cell(row['blocker_id'])} | {_escape_cell(row['checkpoint_id'])} | "
-        f"{_escape_cell(row['feature_id'])} | {_escape_cell(row['task_id'])} | {_escape_cell(row['severity'])} | "
-        f"{_escape_cell(row['type'])} | {_escape_cell(row['placeholder_marker'])} | {_escape_cell(row['owner'])} | "
-        f"{_escape_cell(row['exit_criteria'])} | {_escape_cell(row['status'])} |"
+        f"| {escape_markdown_table_cell(row['blocker_id'])} | {escape_markdown_table_cell(row['checkpoint_id'])} | "
+        f"{escape_markdown_table_cell(row['feature_id'])} | {escape_markdown_table_cell(row['task_id'])} | {escape_markdown_table_cell(row['severity'])} | "
+        f"{escape_markdown_table_cell(row['type'])} | {escape_markdown_table_cell(row['placeholder_marker'])} | {escape_markdown_table_cell(row['owner'])} | "
+        f"{escape_markdown_table_cell(row['exit_criteria'])} | {escape_markdown_table_cell(row['status'])} |"
     )
     with path.open("a", encoding="utf-8") as handle:
         handle.write(line + "\n")

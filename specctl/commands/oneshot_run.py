@@ -99,7 +99,7 @@ def run(args) -> int:
         validation_commands = checkpoint.get("validation_commands", contract.get("validation_commands", []))
         if not isinstance(validation_commands, list):
             validation_commands = []
-        success = _run_validation_group(run_dir, root, checkpoint_id, validation_commands)
+        success, failed_validation_commands = _run_validation_group(run_dir, root, checkpoint_id, validation_commands)
         retry_count = 0
 
         while not success and retry_count < max_retries:
@@ -121,7 +121,9 @@ def run(args) -> int:
                         "output": output[-2000:],
                     },
                 )
-            success = _run_validation_group(run_dir, root, checkpoint_id, validation_commands, phase="retry")
+            success, failed_validation_commands = _run_validation_group(
+                run_dir, root, checkpoint_id, validation_commands, phase="retry"
+            )
 
         if success:
             state["checkpoint_status"][checkpoint_id] = "passed"
@@ -150,7 +152,7 @@ def run(args) -> int:
             },
         )
 
-        if blocker_type in hard_stop_types or _is_repo_integrity_failure(validation_commands):
+        if blocker_type in hard_stop_types or _is_repo_integrity_failure(failed_validation_commands):
             state["checkpoint_status"][checkpoint_id] = "failed_terminal"
             state["status"] = "blocked"
             append_event(
@@ -199,14 +201,15 @@ def _run_validation_group(
     checkpoint_id: str,
     commands: list[str],
     phase: str = "primary",
-) -> bool:
+) -> tuple[bool, list[str]]:
     if not commands:
         append_event(
             run_dir,
             {"type": "validation_group", "checkpoint_id": checkpoint_id, "phase": phase, "result": "empty"},
         )
-        return True
+        return True, []
     group_ok = True
+    failed_commands: list[str] = []
     for command in commands:
         rc, output = run_shell(command, root)
         append_event(
@@ -222,18 +225,14 @@ def _run_validation_group(
         )
         if rc != 0:
             group_ok = False
-    return group_ok
+            failed_commands.append(command)
+    return group_ok, failed_commands
 
 
 def _is_repo_integrity_failure(commands: list[str]) -> bool:
     critical = (
-        "specctl lint",
         "specctl check",
-        "python -m specctl.cli lint",
         "python -m specctl.cli check",
-        "pytest",
-        "npm test",
-        "go test",
     )
     return any(any(token in command for token in critical) for command in commands)
 
