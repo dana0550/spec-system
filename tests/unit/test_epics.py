@@ -79,6 +79,36 @@ def test_oneshot_check_rejects_checkpoint_cycles(tmp_path: Path) -> None:
     assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
 
 
+def test_oneshot_check_handles_non_list_scope_feature_ids(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief = root / "brief.md"
+    _create_brief(brief)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "BadScopeType",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["scope_feature_ids"] = 42
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
+
+
 def test_ui_detection_uses_word_boundaries() -> None:
     assert needs_ui_components("We build resilient backend orchestration.") is False
     assert needs_ui_components("This includes a dashboard workflow.") is True

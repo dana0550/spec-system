@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 from argparse import Namespace
 from pathlib import Path
 
 from specctl.command_utils import format_message
 from specctl.commands import render
-from specctl.commands.oneshot_common import load_epic_and_contract, run_shell, write_run_state
+from specctl.commands.oneshot_common import load_epic_and_contract, read_run_state, run_shell, write_run_state
 from specctl.epic_index import read_epic_rows, write_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
 from specctl.io_utils import now_date, set_frontmatter_value, write_text
@@ -150,7 +149,11 @@ def run(args) -> int:
 
     state_path = run_dir / "state.json"
     if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8"))
+        try:
+            state = read_run_state(run_dir)
+        except ValueError as exc:
+            print(f"[ERROR] {exc}")
+            return 1
     else:
         state = {"checkpoint_status": {}}
     state["status"] = "completed"

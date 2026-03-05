@@ -63,6 +63,7 @@ def validate_oneshot_contract(
                 path=oneshot_path,
             )
         )
+        scope_feature_ids = []
     else:
         for feature_id in scope_feature_ids:
             if feature_id not in feature_by_id:

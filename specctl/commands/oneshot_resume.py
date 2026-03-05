@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from specctl.commands.oneshot_common import append_event, load_epic_and_contract, run_shell, write_run_state
+from specctl.commands.oneshot_common import (
+    append_event,
+    load_epic_and_contract,
+    read_run_state,
+    run_shell,
+    write_run_state,
+)
 from specctl.commands.oneshot_run import _build_scoped_prompt, _is_repo_integrity_failure, _run_validation_group, _write_summary
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import write_text
@@ -28,9 +34,11 @@ def run(args) -> int:
         print(f"[ERROR] Missing run state: {state_path}")
         return 1
 
-    import json
-
-    state = json.loads(state_path.read_text(encoding="utf-8"))
+    try:
+        state = read_run_state(run_dir)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}")
+        return 1
     status = state.get("status")
     if status == "blocked":
         print(f"[ERROR] Run {args.run_id} is hard-blocked and cannot resume")
