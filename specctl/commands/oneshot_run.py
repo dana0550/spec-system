@@ -224,27 +224,40 @@ def _process_checkpoint(
             append_event(run_dir, {"type": "checkpoint_passed", "checkpoint_id": checkpoint_id})
         return blocker_seq, False
 
-    blocker_seq += 1
-    current_blocker_id = blocker_id(epic.epic_id, blocker_seq)
-    placeholder = f"{ONESHOT_PLACEHOLDER_PREFIX}{current_blocker_id}"
     blocker_type = checkpoint.get("blocker_type", "implementation_gap")
     task_ids = checkpoint.get("task_ids", [])
     feature_id = checkpoint.get("feature_id", epic.root_feature_id)
-    append_blocker(
-        run_dir / "blockers.md",
-        {
-            "blocker_id": current_blocker_id,
-            "checkpoint_id": checkpoint_id,
-            "feature_id": feature_id,
-            "task_id": task_ids[0] if task_ids else "",
-            "severity": "high",
-            "type": blocker_type,
-            "placeholder_marker": placeholder,
-            "owner": epic.owner,
-            "exit_criteria": "Checkpoint validations pass without retries",
-            "status": "open",
-        },
+    blockers_path = run_dir / "blockers.md"
+    existing_open = next(
+        (
+            row
+            for row in parse_blockers(blockers_path)
+            if row["checkpoint_id"] == checkpoint_id and row["status"] == "open"
+        ),
+        None,
     )
+    if existing_open:
+        current_blocker_id = existing_open["blocker_id"]
+        placeholder = existing_open["placeholder_marker"] or f"{ONESHOT_PLACEHOLDER_PREFIX}{current_blocker_id}"
+    else:
+        blocker_seq += 1
+        current_blocker_id = blocker_id(epic.epic_id, blocker_seq)
+        placeholder = f"{ONESHOT_PLACEHOLDER_PREFIX}{current_blocker_id}"
+        append_blocker(
+            blockers_path,
+            {
+                "blocker_id": current_blocker_id,
+                "checkpoint_id": checkpoint_id,
+                "feature_id": feature_id,
+                "task_id": task_ids[0] if task_ids else "",
+                "severity": "high",
+                "type": blocker_type,
+                "placeholder_marker": placeholder,
+                "owner": epic.owner,
+                "exit_criteria": "Checkpoint validations pass without retries",
+                "status": "open",
+            },
+        )
 
     if blocker_type in hard_stop_types or _is_repo_integrity_failure(failed_commands):
         state["checkpoint_status"][checkpoint_id] = "failed_terminal"
