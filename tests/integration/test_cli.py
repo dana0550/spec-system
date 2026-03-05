@@ -869,6 +869,57 @@ def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: 
     assert epics_path.read_text(encoding="utf-8") == epics_before
 
 
+def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "WriteRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+    features_before = features_path.read_text(encoding="utf-8")
+    epics_before = epics_path.read_text(encoding="utf-8")
+
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    scope_row = next(row for row in read_feature_rows(features_path) if row.feature_id in scope_ids)
+    requirements_path = (root / "docs" / scope_row.spec_path).parent / "requirements.md"
+    requirements_before = requirements_path.read_text(encoding="utf-8")
+
+    def failing_write_epics(path: Path, rows, version: str) -> None:
+        path.write_text("CORRUPTED EPICS\n", encoding="utf-8")
+        raise RuntimeError("forced epics write failure")
+
+    monkeypatch.setattr(oneshot_finalize_command, "write_epic_rows", failing_write_epics)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    assert features_path.read_text(encoding="utf-8") == features_before
+    assert epics_path.read_text(encoding="utf-8") == epics_before
+    assert requirements_path.read_text(encoding="utf-8") == requirements_before
+
+
 def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()

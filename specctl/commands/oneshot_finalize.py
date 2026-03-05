@@ -127,7 +127,21 @@ def run(args) -> int:
                 write_text(path, original_text)
 
     scope_set = set(contract.get("scope_feature_ids", []))
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+    brief_path = epic_dir / "brief.md"
+    product_map_path = root / "docs" / "PRODUCT_MAP.md"
+    traceability_path = root / "docs" / "TRACEABILITY.md"
     try:
+        # Snapshot shared finalize outputs up front so any mid-flight failure
+        # can restore a fully consistent docs state.
+        _snapshot(features_path)
+        _snapshot(epics_path)
+        _snapshot(product_map_path)
+        _snapshot(traceability_path)
+        if brief_path.exists():
+            _snapshot(brief_path)
+
         for row in feature_rows:
             if row.feature_id in scope_set:
                 row.status = "done"
@@ -137,26 +151,15 @@ def run(args) -> int:
                     if path.exists():
                         _snapshot(path)
                         set_frontmatter_value(path, "status", "done")
-        features_path = root / "docs" / "FEATURES.md"
-        _snapshot(features_path)
         write_feature_rows(features_path, feature_rows, version="2.1.0")
 
-        epics_path = root / "docs" / "EPICS.md"
         epic_rows = read_epic_rows(epics_path)
         for row in epic_rows:
             if row.epic_id == epic.epic_id:
                 row.status = "done"
-        _snapshot(epics_path)
         write_epic_rows(epics_path, epic_rows, version="2.1.0")
-        brief_path = epic_dir / "brief.md"
         if brief_path.exists():
-            _snapshot(brief_path)
             set_frontmatter_value(brief_path, "status", "done")
-
-        product_map_path = root / "docs" / "PRODUCT_MAP.md"
-        traceability_path = root / "docs" / "TRACEABILITY.md"
-        _snapshot(product_map_path)
-        _snapshot(traceability_path)
 
         render_rc = render.run(Namespace(root=str(root), check=False))
         if render_rc != 0:
