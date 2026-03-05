@@ -59,6 +59,11 @@ def run(args) -> int:
             )
         )
 
+    if messages:
+        for message in messages:
+            print(format_message(message))
+        return 1
+
     required_finalize_commands = contract.get("finalize_gates", {}).get(
         "required_validation_commands"
     )
@@ -107,11 +112,6 @@ def run(args) -> int:
                         line=trace_message.line,
                     )
                 )
-
-    if messages:
-        for message in messages:
-            print(format_message(message))
-        return 1
 
     rollback_contents: dict[Path, str | None] = {}
 

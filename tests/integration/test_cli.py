@@ -908,6 +908,44 @@ def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
 
 
+def test_oneshot_finalize_short_circuits_validation_when_blocked(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeShortCircuitFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_id = next((epic_dir / "runs").iterdir()).name
+
+    def should_not_run_shell(_command: str, _cwd: Path) -> tuple[int, str]:
+        raise AssertionError("run_shell should not execute after finalize pre-checks already failed")
+
+    monkeypatch.setattr(oneshot_finalize_command, "run_shell", should_not_run_shell)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+
 def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
