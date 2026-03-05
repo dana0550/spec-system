@@ -7,8 +7,8 @@ from specctl.models import EpicRow, FeatureRow, LintMessage
 from specctl.oneshot_utils import HARD_STOP_TYPES, load_json_document, parse_blockers, parse_task_ids
 
 
-CHECKPOINT_ID_RE = re.compile(r"^C-E\d{3}-\d{3}$")
-BLOCKER_ID_RE = re.compile(r"^B-E\d{3}-\d{3}$")
+CHECKPOINT_ID_RE = re.compile(r"^C-E\d{3}-\d{3,}$")
+BLOCKER_ID_RE = re.compile(r"^B-E\d{3}-\d{3,}$")
 REQUIRED_ONESHOT_KEYS = {
     "epic_id",
     "root_feature_id",

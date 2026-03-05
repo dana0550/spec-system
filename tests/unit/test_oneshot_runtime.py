@@ -6,6 +6,7 @@ from pathlib import Path
 from specctl.commands.oneshot_common import run_shell
 from specctl.commands.oneshot_run import _is_repo_integrity_failure, _run_validation_group
 from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers
+from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
 
 def test_run_shell_does_not_execute_shell_chain(tmp_path: Path) -> None:
@@ -125,3 +126,10 @@ def test_collect_run_stats_aggregates_state_and_blockers(tmp_path: Path) -> None
     assert stats["checkpoints_failed"] == 2
     assert stats["blockers_opened"] == 2
     assert stats["blockers_resolved"] == 1
+
+
+def test_oneshot_id_regex_allows_suffixes_with_more_than_three_digits() -> None:
+    assert CHECKPOINT_ID_RE.match("C-E001-001")
+    assert CHECKPOINT_ID_RE.match("C-E001-1000")
+    assert BLOCKER_ID_RE.match("B-E001-001")
+    assert BLOCKER_ID_RE.match("B-E001-1000")
