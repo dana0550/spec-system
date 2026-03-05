@@ -13,6 +13,15 @@ FEATURE_STATUSES = {
     "deprecated",
 }
 
+EPIC_STATUSES = {
+    "planning",
+    "implementing",
+    "verifying",
+    "done",
+    "blocked",
+    "deprecated",
+}
+
 APPROVAL_TRANSITIONS = {
     "requirements": ("requirements_draft", "requirements_approved"),
     "design": ("design_draft", "design_approved"),
@@ -42,3 +51,5 @@ REQUIRED_DOC_FILES = {
     "TRACEABILITY.md",
     "STEERING.md",
 }
+
+ONESHOT_PLACEHOLDER_PREFIX = "ONESHOT-BLOCKER:"

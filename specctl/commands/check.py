@@ -9,7 +9,7 @@ from specctl.validators.project import lint_project
 
 def run(args) -> int:
     root = project_root(args.root)
-    messages, stats = lint_project(root)
+    messages, stats, _ = lint_project(root)
     print_messages(messages)
     lint_failed = has_errors(messages, strict=args.strict)
     render_rc = render.run(Namespace(root=str(root), check=True, stats=stats))

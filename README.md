@@ -1,14 +1,18 @@
 # docs-spec-system
 
-This repository distributes the `docs-spec-system` Codex Skill and Spec System v2 CLI (`specctl`).
+This repository distributes the `docs-spec-system` Codex Skill and Spec System v2.1 CLI (`specctl`).
 
-## What Changed In v2
+## What Changed In v2.1
 
 - Phase-gated feature artifacts (`requirements`, `design`, `tasks`, `verification`)
+- First-class epic registry and one-shot contract artifacts
+- Deterministic epic decomposition into feature trees
+- Checkpointed one-shot run/resume/finalize commands with blocker ledgers
+- Built-in run memory pack artifacts for long-horizon context continuity
 - Mandatory EARS + RFC requirement language
 - Mandatory Gherkin acceptance scenarios
 - Strict traceability chain: `R -> D -> T -> S -> evidence`
-- First-class CLI for deterministic lint/render/check/approve/migrate/report
+- First-class CLI for deterministic feature/epic/oneshot/lint/render/check/approve/migrate/report
 - Migration command from v1 docs layout
 
 ## Install Skill
@@ -24,6 +28,12 @@ Restart Codex after installation.
 ```bash
 specctl init
 specctl feature create --name "User Authentication" --owner team@example.com
+specctl feature check --feature-id F-001
+specctl epic create --name "Commerce Platform" --owner team@example.com --brief ./epic-brief.md
+specctl oneshot run --epic-id E-001 --runner codex
+specctl oneshot check --epic-id E-001
+specctl oneshot finalize --epic-id E-001 --run-id RUN-<timestamp>
+specctl oneshot report --epic-id E-001
 specctl lint
 specctl render
 specctl check
@@ -57,8 +67,8 @@ Official releases are Git tags and GitHub Releases.
 git fetch origin
 git switch main
 git pull --ff-only
-git tag -a v2.0.0 -m "docs-spec-system v2.0.0"
-git push origin v2.0.0
+git tag -a v2.1.0 -m "docs-spec-system v2.1.0"
+git push origin v2.1.0
 ```
 
 Release policy:

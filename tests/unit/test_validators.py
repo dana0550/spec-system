@@ -90,5 +90,5 @@ def test_ears_trigger_requires_word_boundary(tmp_path: Path) -> None:
 
 
 def test_project_lint_detects_missing_docs(tmp_path: Path) -> None:
-    messages, _ = lint_project(tmp_path)
+    messages, _, _ = lint_project(tmp_path)
     assert any(m.code == "DOCS_MISSING" for m in messages)

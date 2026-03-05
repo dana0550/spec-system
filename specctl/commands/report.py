@@ -8,7 +8,7 @@ from specctl.validators.project import lint_project
 
 def run(args) -> int:
     root = project_root(args.root)
-    messages, stats = lint_project(root)
+    messages, stats, oneshot_stats = lint_project(root)
     errors = sum(1 for m in messages if m.severity == "ERROR")
     warnings = sum(1 for m in messages if m.severity == "WARN")
 
@@ -20,6 +20,13 @@ def run(args) -> int:
         "requirements_with_tasks": stats.requirements_with_tasks,
         "scenarios_total": stats.scenarios_total,
         "scenarios_with_evidence": stats.scenarios_with_evidence,
+        "epics_total": oneshot_stats.epics_total,
+        "active_runs": oneshot_stats.active_runs,
+        "checkpoints_passed": oneshot_stats.checkpoints_passed,
+        "checkpoints_failed": oneshot_stats.checkpoints_failed,
+        "blockers_opened": oneshot_stats.blockers_opened,
+        "blockers_resolved": oneshot_stats.blockers_resolved,
+        "placeholder_leakage_count": oneshot_stats.placeholder_leakage_count,
     }
 
     if args.json:

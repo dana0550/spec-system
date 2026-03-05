@@ -3,11 +3,28 @@ from __future__ import annotations
 import argparse
 
 from specctl import __version__
-from specctl.commands import approve, check, feature_create, init, lint, migrate, render, report
+from specctl.commands import (
+    approve,
+    check,
+    epic_check,
+    epic_create,
+    feature_check,
+    feature_create,
+    init,
+    lint,
+    migrate,
+    oneshot_check,
+    oneshot_finalize,
+    oneshot_report,
+    oneshot_resume,
+    oneshot_run,
+    render,
+    report,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="specctl", description="Spec System v2 CLI")
+    parser = argparse.ArgumentParser(prog="specctl", description="Spec System v2.1 CLI")
     parser.add_argument("--version", action="version", version=f"specctl {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -27,6 +44,60 @@ def build_parser() -> argparse.ArgumentParser:
     feature_create_parser.add_argument("--status", default="requirements_draft")
     feature_create_parser.add_argument("--owner", default="unassigned")
     feature_create_parser.set_defaults(func=feature_create.run)
+
+    feature_check_parser = feature_sub.add_parser("check", help="Check one feature's requirement/traceability integrity")
+    feature_check_parser.add_argument("--root", default=".")
+    feature_check_parser.add_argument("--feature-id", required=True)
+    feature_check_parser.set_defaults(func=feature_check.run)
+
+    epic_parser = subparsers.add_parser("epic", help="Epic operations")
+    epic_sub = epic_parser.add_subparsers(dest="epic_command", required=True)
+
+    epic_create_parser = epic_sub.add_parser("create", help="Create an epic and scaffold one-shot feature tree")
+    epic_create_parser.add_argument("--root", default=".")
+    epic_create_parser.add_argument("--name", required=True)
+    epic_create_parser.add_argument("--owner", default="unassigned")
+    epic_create_parser.add_argument("--brief", required=True)
+    epic_create_parser.add_argument("--feature-id")
+    epic_create_parser.set_defaults(func=epic_create.run)
+
+    epic_check_parser = epic_sub.add_parser("check", help="Validate one epic and its one-shot artifacts")
+    epic_check_parser.add_argument("--root", default=".")
+    epic_check_parser.add_argument("--epic-id", required=True)
+    epic_check_parser.set_defaults(func=epic_check.run)
+
+    oneshot_parser = subparsers.add_parser("oneshot", help="One-shot epic execution commands")
+    oneshot_sub = oneshot_parser.add_subparsers(dest="oneshot_command", required=True)
+
+    oneshot_run_parser = oneshot_sub.add_parser("run", help="Start one-shot execution for an epic")
+    oneshot_run_parser.add_argument("--root", default=".")
+    oneshot_run_parser.add_argument("--epic-id", required=True)
+    oneshot_run_parser.add_argument("--runner", choices=["codex", "claude"])
+    oneshot_run_parser.set_defaults(func=oneshot_run.run)
+
+    oneshot_resume_parser = oneshot_sub.add_parser("resume", help="Resume an existing one-shot run")
+    oneshot_resume_parser.add_argument("--root", default=".")
+    oneshot_resume_parser.add_argument("--epic-id", required=True)
+    oneshot_resume_parser.add_argument("--run-id", required=True)
+    oneshot_resume_parser.set_defaults(func=oneshot_resume.run)
+
+    oneshot_check_parser = oneshot_sub.add_parser("check", help="Validate one-shot contract and run artifacts")
+    oneshot_check_parser.add_argument("--root", default=".")
+    oneshot_check_parser.add_argument("--epic-id", required=True)
+    oneshot_check_parser.add_argument("--run-id")
+    oneshot_check_parser.set_defaults(func=oneshot_check.run)
+
+    oneshot_finalize_parser = oneshot_sub.add_parser("finalize", help="Finalize one-shot run and mark scope done")
+    oneshot_finalize_parser.add_argument("--root", default=".")
+    oneshot_finalize_parser.add_argument("--epic-id", required=True)
+    oneshot_finalize_parser.add_argument("--run-id", required=True)
+    oneshot_finalize_parser.set_defaults(func=oneshot_finalize.run)
+
+    oneshot_report_parser = oneshot_sub.add_parser("report", help="Report one-shot metrics for an epic")
+    oneshot_report_parser.add_argument("--root", default=".")
+    oneshot_report_parser.add_argument("--epic-id", required=True)
+    oneshot_report_parser.add_argument("--json", action="store_true")
+    oneshot_report_parser.set_defaults(func=oneshot_report.run)
 
     lint_parser = subparsers.add_parser("lint", help="Lint docs against v2 rules")
     lint_parser.add_argument("--root", default=".")

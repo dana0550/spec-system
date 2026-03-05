@@ -11,7 +11,7 @@ def render_traceability(stats: TraceabilityStats) -> str:
     lines = [
         "---",
         "doc_type: traceability",
-        "version: 2.0.0",
+        "version: 2.1.0",
         "last_rendered: TBD",
         "---",
         "# Traceability Report",

@@ -60,7 +60,7 @@ def run(args) -> int:
             print("[ERROR] Migration render step failed")
             return 1
 
-        messages, _ = lint_project(staged_root)
+        messages, _, _ = lint_project(staged_root)
         errors = [m for m in messages if m.severity == "ERROR"]
         if errors:
             print("[ERROR] Migration completed with blocking issues:")
@@ -235,7 +235,7 @@ def _ensure_base_v2_docs(docs: Path) -> None:
                 "---",
                 "doc_type: master_spec",
                 "product_name: Migrated Product",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 "status: active",
                 "owners: []",
                 f"last_reviewed: {now_date()}",
@@ -249,7 +249,7 @@ def _ensure_base_v2_docs(docs: Path) -> None:
             [
                 "---",
                 "doc_type: steering",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 f"last_reviewed: {now_date()}",
                 "---",
                 "# Steering",
@@ -273,7 +273,7 @@ def _ensure_base_v2_docs(docs: Path) -> None:
             [
                 "---",
                 "doc_type: traceability",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 f"last_rendered: {now_date()}",
                 "---",
                 "# Traceability Report",

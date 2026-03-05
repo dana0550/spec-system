@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from pathlib import Path
@@ -479,3 +480,188 @@ def _assert_feature_status(root: Path, feature_id: str, expected_status: str) ->
     for filename in ["requirements.md", "design.md", "tasks.md", "verification.md"]:
         text = (feature_dir / filename).read_text(encoding="utf-8")
         assert f"status: {expected_status}" in text
+
+
+def _write_epic_brief(path: Path, *, include_ui: bool = False) -> None:
+    vision = "- Deliver account orchestration and reporting."
+    if include_ui:
+        vision = "- Deliver account orchestration and reporting dashboard."
+    path.write_text(
+        "\n".join(
+            [
+                "# Example Epic",
+                "",
+                "## Vision",
+                vision,
+                "",
+                "## Outcomes",
+                "- Improve setup reliability",
+                "- Improve operational insight",
+                "",
+                "## User Journeys",
+                "- Admin provisions tenant",
+                "- Admin reviews onboarding status",
+                "",
+                "## Constraints",
+                "- Must preserve existing API compatibility",
+                "",
+                "## Non-Goals",
+                "- No billing changes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_feature_check_command_passes_for_scaffolded_feature(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "FeatureCheck", "--owner", "owner@example.com"]) == 0
+    assert main(["feature", "check", "--root", str(root), "--feature-id", "F-001"]) == 0
+
+
+def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "Account Onboarding",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | Account Onboarding | implementing | F-001 |" in epics_text
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert len(rows) == 13
+    assert rows[0].feature_id == "F-001"
+    assert any(row.feature_id == "F-001.01.05" for row in rows)
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot["epic_id"] == "E-001"
+    assert len(oneshot["scope_feature_ids"]) == 13
+    assert len(oneshot["checkpoint_graph"]) == 13
+    assert oneshot["checkpoint_graph"][0]["depends_on"] == []
+    assert oneshot["checkpoint_graph"][1]["depends_on"] == [oneshot["checkpoint_graph"][0]["checkpoint_id"]]
+
+
+def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MissingValidationCommands",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = []
+    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
+
+
+def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | FinalizeFlow | done |" in epics_text
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    scope_ids = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    for row in rows:
+        if row.feature_id in scope_ids:
+            assert row.status == "done"
+
+
+def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "BlockerFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    blockers = (run_dir / "blockers.md").read_text(encoding="utf-8")
+    assert "B-E001-001" in blockers
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1

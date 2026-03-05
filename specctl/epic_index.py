@@ -4,11 +4,11 @@ import re
 from pathlib import Path
 
 from specctl.io_utils import now_date, read_text, write_text
-from specctl.models import FeatureRow
+from specctl.models import EpicRow
 
 
-TABLE_HEADER = "| ID | Name | Status | Parent ID | Spec Path | Owner | Aliases |"
-TABLE_RULE = "|----|------|--------|-----------|-----------|-------|---------|"
+TABLE_HEADER = "| ID | Name | Status | Root Feature ID | Epic Path | Owner | Aliases |"
+TABLE_RULE = "|----|------|--------|-----------------|-----------|-------|---------|"
 
 
 def _escape_cell(value: str) -> str:
@@ -36,11 +36,11 @@ def _split_row_cells(line: str) -> list[str]:
     return cells
 
 
-def read_feature_rows(path: Path) -> list[FeatureRow]:
+def read_epic_rows(path: Path) -> list[EpicRow]:
     if not path.exists():
         return []
     text = read_text(path)
-    rows: list[FeatureRow] = []
+    rows: list[EpicRow] = []
     for line in text.splitlines():
         if not line.startswith("|"):
             continue
@@ -49,15 +49,15 @@ def read_feature_rows(path: Path) -> list[FeatureRow]:
         parts = _split_row_cells(line.strip().strip("|"))
         if len(parts) < 7:
             continue
-        if not parts[0].startswith("F-"):
+        if not parts[0].startswith("E-"):
             continue
         rows.append(
-            FeatureRow(
-                feature_id=parts[0],
+            EpicRow(
+                epic_id=parts[0],
                 name=parts[1],
                 status=parts[2],
-                parent_id=parts[3],
-                spec_path=parts[4],
+                root_feature_id=parts[3],
+                epic_path=parts[4],
                 owner=parts[5],
                 aliases=parts[6],
             )
@@ -65,14 +65,14 @@ def read_feature_rows(path: Path) -> list[FeatureRow]:
     return rows
 
 
-def write_feature_rows(path: Path, rows: list[FeatureRow], version: str = "2.1.0") -> None:
+def write_epic_rows(path: Path, rows: list[EpicRow], version: str = "2.1.0") -> None:
     lines = [
         "---",
-        "doc_type: feature_index",
+        "doc_type: epic_index",
         f"version: {version}",
         f"last_synced: {now_date()}",
         "---",
-        "# Features Index",
+        "# Epics Index",
         "",
         TABLE_HEADER,
         TABLE_RULE,
@@ -80,11 +80,11 @@ def write_feature_rows(path: Path, rows: list[FeatureRow], version: str = "2.1.0
     for row in rows:
         lines.append(
             "| "
-            f"{_escape_cell(row.feature_id)} | "
+            f"{_escape_cell(row.epic_id)} | "
             f"{_escape_cell(row.name)} | "
             f"{_escape_cell(row.status)} | "
-            f"{_escape_cell(row.parent_id)} | "
-            f"{_escape_cell(row.spec_path)} | "
+            f"{_escape_cell(row.root_feature_id)} | "
+            f"{_escape_cell(row.epic_path)} | "
             f"{_escape_cell(row.owner)} | "
             f"{_escape_cell(row.aliases)} |"
         )
@@ -92,28 +92,11 @@ def write_feature_rows(path: Path, rows: list[FeatureRow], version: str = "2.1.0
     write_text(path, "\n".join(lines))
 
 
-def next_top_level_id(rows: list[FeatureRow]) -> str:
+def next_epic_id(rows: list[EpicRow]) -> str:
     nums = []
     for row in rows:
-        if "." in row.feature_id:
-            continue
-        match = re.match(r"F-(\d{3})$", row.feature_id)
+        match = re.match(r"E-(\d{3})$", row.epic_id)
         if match:
             nums.append(int(match.group(1)))
     nxt = max(nums, default=0) + 1
-    return f"F-{nxt:03d}"
-
-
-def next_child_id(rows: list[FeatureRow], parent_id: str) -> str:
-    nums = []
-    prefix = f"{parent_id}."
-    for row in rows:
-        if not row.feature_id.startswith(prefix):
-            continue
-        rest = row.feature_id[len(prefix) :]
-        if "." in rest:
-            continue
-        if rest.isdigit():
-            nums.append(int(rest))
-    nxt = max(nums, default=0) + 1
-    return f"{parent_id}.{nxt:02d}"
+    return f"E-{nxt:03d}"
