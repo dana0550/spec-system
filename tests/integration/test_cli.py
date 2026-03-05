@@ -946,7 +946,7 @@ def test_oneshot_finalize_short_circuits_validation_when_blocked(tmp_path: Path,
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
 
 
-def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(tmp_path: Path) -> None:
+def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
@@ -979,6 +979,11 @@ def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
     run_dir = next((epic_dir / "runs").iterdir())
     run_id = run_dir.name
+
+    def should_not_validate(_feature_dir: Path):
+        raise AssertionError("traceability checks should not run after finalize validation command failure")
+
+    monkeypatch.setattr(oneshot_finalize_command, "validate_feature_traceability", should_not_validate)
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
 
     epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")

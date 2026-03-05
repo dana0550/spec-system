@@ -102,7 +102,6 @@ EOF
   )
   log "Launching codex auto-address run for unresolved Bugbot threads"
   codex exec \
-    --dangerously-bypass-approvals-and-sandbox \
     -C "$REPO_ROOT" \
     "$prompt" 2>&1 | tee -a "$LOG_FILE" || true
 }

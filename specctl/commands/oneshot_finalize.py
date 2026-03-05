@@ -86,6 +86,11 @@ def run(args) -> int:
                 )
             )
 
+    if messages:
+        for message in messages:
+            print(format_message(message))
+        return 1
+
     feature_rows = read_feature_rows(root / "docs" / "FEATURES.md")
     feature_by_id = {row.feature_id: row for row in feature_rows}
     for feature_id in contract.get("scope_feature_ids", []):

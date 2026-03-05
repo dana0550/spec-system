@@ -7,7 +7,7 @@ from specctl.commands.oneshot_common import (
     read_run_state,
     write_run_state,
 )
-from specctl.commands.oneshot_run import _finalize_run_status, _process_checkpoint, _write_summary
+from specctl.commands.oneshot_runtime import finalize_run_status, process_checkpoint, write_summary
 from specctl.oneshot_utils import parse_blockers, write_memory_files
 
 
@@ -71,7 +71,7 @@ def run(args) -> int:
 
             progressed = True
             attempted_checkpoints.add(checkpoint_id)
-            blocker_seq, hard_stopped = _process_checkpoint(
+            blocker_seq, hard_stopped = process_checkpoint(
                 run_dir=run_dir,
                 root=root,
                 epic=epic,
@@ -101,12 +101,12 @@ def run(args) -> int:
         if not progressed:
             break
 
-    _finalize_run_status(state)
+    finalize_run_status(state)
 
     write_run_state(run_dir, state)
     blockers = parse_blockers(run_dir / "blockers.md")
     write_memory_files(epic_dir / "memory", state, [row for row in blockers if row["status"] == "open"])
-    _write_summary(run_dir, state, blockers)
+    write_summary(run_dir, state, blockers)
     print(f"Resumed one-shot run {args.run_id} for epic {epic.epic_id}")
     print(f"Run status: {state['status']}")
     return 1 if state["status"] == "blocked" else 0

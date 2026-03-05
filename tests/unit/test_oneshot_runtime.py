@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from specctl.commands.oneshot_common import run_shell
-from specctl.commands.oneshot_run import _is_repo_integrity_failure, _run_validation_group
+from specctl.commands.oneshot_runtime import is_repo_integrity_failure, run_validation_group
 from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, parse_task_ids, scan_placeholder_markers
 from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
@@ -31,18 +31,18 @@ def test_run_shell_returns_error_for_missing_binary(tmp_path: Path) -> None:
 def test_validation_group_empty_commands_is_success(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    success, failed = _run_validation_group(run_dir, tmp_path, "C-E001-001", [])
+    success, failed = run_validation_group(run_dir, tmp_path, "C-E001-001", [])
     assert success is True
     assert failed == []
 
 
 def test_repo_integrity_failure_checks_failed_commands_only() -> None:
-    assert _is_repo_integrity_failure(["specctl check --root ."]) is True
-    assert _is_repo_integrity_failure(["python -m specctl.cli check --root ."]) is True
-    assert _is_repo_integrity_failure(["python3 -m specctl.cli check --root ."]) is True
-    assert _is_repo_integrity_failure(["python -c \"import sys; sys.exit(1)\""]) is False
-    assert _is_repo_integrity_failure(["echo specctl check"]) is False
-    assert _is_repo_integrity_failure(["./run-specctl-check-suite.sh"]) is False
+    assert is_repo_integrity_failure(["specctl check --root ."]) is True
+    assert is_repo_integrity_failure(["python -m specctl.cli check --root ."]) is True
+    assert is_repo_integrity_failure(["python3 -m specctl.cli check --root ."]) is True
+    assert is_repo_integrity_failure(["python -c \"import sys; sys.exit(1)\""]) is False
+    assert is_repo_integrity_failure(["echo specctl check"]) is False
+    assert is_repo_integrity_failure(["./run-specctl-check-suite.sh"]) is False
 
 
 def test_blocker_ledger_roundtrips_pipe_characters(tmp_path: Path) -> None:
