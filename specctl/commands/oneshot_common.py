@@ -42,15 +42,18 @@ def run_shell(command: str, root: Path) -> tuple[int, str]:
     if not argv:
         return 1, "Empty command."
 
-    proc = subprocess.run(
-        argv,
-        cwd=root,
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-    )
+    try:
+        proc = subprocess.run(
+            argv,
+            cwd=root,
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        return 1, f"Unable to execute command '{argv[0]}': {exc}"
     return proc.returncode, (proc.stdout or "")
 
 

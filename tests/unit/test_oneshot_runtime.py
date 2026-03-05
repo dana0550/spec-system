@@ -20,6 +20,14 @@ def test_run_shell_does_not_execute_shell_chain(tmp_path: Path) -> None:
     assert not marker.exists()
 
 
+def test_run_shell_returns_error_for_missing_binary(tmp_path: Path) -> None:
+    command = "definitely-not-a-real-binary-oneshot-command"
+    rc, output = run_shell(command, tmp_path)
+    assert rc == 1
+    assert "Unable to execute command" in output
+    assert command in output
+
+
 def test_validation_group_empty_commands_is_success(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

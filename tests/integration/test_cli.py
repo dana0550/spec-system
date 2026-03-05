@@ -681,6 +681,48 @@ def test_oneshot_run_uses_soft_blocker_for_non_integrity_failure(tmp_path: Path)
     assert state["checkpoint_status"][first_checkpoint] == "blocked_with_placeholder"
 
 
+def test_oneshot_run_handles_missing_validation_binary_without_crashing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MissingBinaryRunFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    command = "definitely-not-a-real-binary-oneshot-command"
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["repair_policy"]["max_retries_per_checkpoint"] = 0
+    payload["validation_commands"] = [command]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = [command]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    first_checkpoint = payload["checkpoint_graph"][0]["checkpoint_id"]
+    assert state["status"] == "stabilizing"
+    assert state["checkpoint_status"][first_checkpoint] == "blocked_with_placeholder"
+    assert "Unable to execute command" in (run_dir / "events.jsonl").read_text(encoding="utf-8")
+
+
 def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -1118,6 +1160,54 @@ def test_oneshot_resume_processes_in_progress_checkpoint(tmp_path: Path) -> None
     resumed_state = json.loads(state_path.read_text(encoding="utf-8"))
     assert resumed_state["status"] == "ready_to_finalize"
     assert all(value == "passed" for value in resumed_state["checkpoint_status"].values())
+
+
+def test_oneshot_resume_handles_missing_validation_binary_without_crashing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MissingBinaryResumeFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    command = "definitely-not-a-real-binary-oneshot-command"
+    payload["validation_commands"] = [command]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = [command]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    resumed_state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert resumed_state["status"] == "stabilizing"
+    events_text = (run_dir / "events.jsonl").read_text(encoding="utf-8")
+    assert '"phase": "resume"' in events_text
+    assert "Unable to execute command" in events_text
 
 
 def test_oneshot_run_retries_pending_checkpoints_after_late_dependency_pass(tmp_path: Path) -> None:
