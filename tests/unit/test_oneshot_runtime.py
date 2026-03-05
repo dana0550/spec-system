@@ -123,5 +123,5 @@ def test_collect_run_stats_aggregates_state_and_blockers(tmp_path: Path) -> None
     assert stats["active_runs"] == 1
     assert stats["checkpoints_passed"] == 2
     assert stats["checkpoints_failed"] == 2
-    assert stats["blockers_opened"] == 1
+    assert stats["blockers_opened"] == 2
     assert stats["blockers_resolved"] == 1

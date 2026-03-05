@@ -168,8 +168,7 @@ def collect_run_stats(runs_dir: Path) -> dict[str, int]:
                 )
 
         for blocker in parse_blockers(run_dir / "blockers.md"):
-            if blocker["status"] == "open":
-                totals["blockers_opened"] += 1
+            totals["blockers_opened"] += 1
             if blocker["status"] == "resolved":
                 totals["blockers_resolved"] += 1
     return totals
