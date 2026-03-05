@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from specctl.commands.oneshot_common import load_epic_and_contract, write_run_state
-from specctl.commands.oneshot_runtime import finalize_run_status, process_checkpoint, write_summary
+from specctl.commands.oneshot_runtime import CheckpointExecutionConfig, finalize_run_status, process_checkpoint, write_summary
 from specctl.io_utils import now_timestamp, write_text
 from specctl.oneshot_utils import empty_blocker_ledger, new_run_id, parse_blockers, write_memory_files
 
@@ -48,6 +48,20 @@ def run(args) -> int:
     repair_commands = repair_policy.get("commands", [])
     if not isinstance(repair_commands, list):
         repair_commands = []
+    run_config = CheckpointExecutionConfig(
+        prompt_suffix=".prompt.md",
+        checkpoint_event_type="checkpoint_start",
+        checkpoint_event_extra={"runner": runner},
+        runner_event_type="runner_invocation",
+        runner_fallback_output="Runner command not configured; validation-only execution.",
+        repair_attempt_event_type="repair_attempt",
+        repair_event_type="repair_command",
+        validation_phase="primary",
+        retry_phase="retry",
+        resolve_blockers_on_success=False,
+        emit_checkpoint_passed_event=True,
+        emit_blocker_events=True,
+    )
 
     blocker_seq = 0
     while state["status"] == "running":
@@ -74,18 +88,7 @@ def run(args) -> int:
                 max_retries=max_retries,
                 hard_stop_types=hard_stop_types,
                 blocker_seq=blocker_seq,
-                prompt_suffix=".prompt.md",
-                checkpoint_event_type="checkpoint_start",
-                checkpoint_event_extra={"runner": runner},
-                runner_event_type="runner_invocation",
-                runner_fallback_output="Runner command not configured; validation-only execution.",
-                repair_attempt_event_type="repair_attempt",
-                repair_event_type="repair_command",
-                validation_phase="primary",
-                retry_phase="retry",
-                resolve_blockers_on_success=False,
-                emit_checkpoint_passed_event=True,
-                emit_blocker_events=True,
+                config=run_config,
             )
             if hard_stopped:
                 break

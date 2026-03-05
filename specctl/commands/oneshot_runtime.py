@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import shlex
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,22 @@ from specctl.commands.oneshot_common import append_event, run_shell
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import now_date, write_text
 from specctl.oneshot_utils import append_blocker, blocker_id, parse_blockers, resolve_blockers_for_checkpoint
+
+
+@dataclass(frozen=True)
+class CheckpointExecutionConfig:
+    prompt_suffix: str
+    checkpoint_event_type: str
+    checkpoint_event_extra: dict[str, Any] | None
+    runner_event_type: str
+    runner_fallback_output: str
+    repair_attempt_event_type: str | None
+    repair_event_type: str
+    validation_phase: str
+    retry_phase: str
+    resolve_blockers_on_success: bool
+    emit_checkpoint_passed_event: bool
+    emit_blocker_events: bool
 
 
 def process_checkpoint(
@@ -23,27 +40,16 @@ def process_checkpoint(
     max_retries: int,
     hard_stop_types: set[str],
     blocker_seq: int,
-    prompt_suffix: str,
-    checkpoint_event_type: str,
-    checkpoint_event_extra: dict[str, Any] | None,
-    runner_event_type: str,
-    runner_fallback_output: str,
-    repair_attempt_event_type: str | None,
-    repair_event_type: str,
-    validation_phase: str,
-    retry_phase: str,
-    resolve_blockers_on_success: bool,
-    emit_checkpoint_passed_event: bool,
-    emit_blocker_events: bool,
+    config: CheckpointExecutionConfig,
 ) -> tuple[int, bool]:
     state["checkpoint_status"][checkpoint_id] = "in_progress"
     state["last_checkpoint"] = checkpoint_id
-    checkpoint_event = {"type": checkpoint_event_type, "checkpoint_id": checkpoint_id}
-    if checkpoint_event_extra:
-        checkpoint_event.update(checkpoint_event_extra)
+    checkpoint_event = {"type": config.checkpoint_event_type, "checkpoint_id": checkpoint_id}
+    if config.checkpoint_event_extra:
+        checkpoint_event.update(config.checkpoint_event_extra)
     append_event(run_dir, checkpoint_event)
 
-    prompt_path = run_dir / f"{checkpoint_id}{prompt_suffix}"
+    prompt_path = run_dir / f"{checkpoint_id}{config.prompt_suffix}"
     prompt_text = build_scoped_prompt(epic.epic_id, state["run_id"], checkpoint)
     write_text(prompt_path, prompt_text)
 
@@ -53,7 +59,7 @@ def process_checkpoint(
         append_event(
             run_dir,
             {
-                "type": runner_event_type,
+                "type": config.runner_event_type,
                 "checkpoint_id": checkpoint_id,
                 "command": runner_command,
                 "prompt_path": str(prompt_path),
@@ -65,12 +71,12 @@ def process_checkpoint(
         append_event(
             run_dir,
             {
-                "type": runner_event_type,
+                "type": config.runner_event_type,
                 "checkpoint_id": checkpoint_id,
                 "command": "",
                 "prompt_path": str(prompt_path),
                 "rc": 0,
-                "output": runner_fallback_output,
+                "output": config.runner_fallback_output,
             },
         )
 
@@ -82,22 +88,22 @@ def process_checkpoint(
         root,
         checkpoint_id,
         validation_commands,
-        phase=validation_phase,
+        phase=config.validation_phase,
     )
     retry_count = 0
     while not success and retry_count < max_retries:
         retry_count += 1
-        if repair_attempt_event_type:
+        if config.repair_attempt_event_type:
             append_event(
                 run_dir,
-                {"type": repair_attempt_event_type, "checkpoint_id": checkpoint_id, "attempt": retry_count},
+                {"type": config.repair_attempt_event_type, "checkpoint_id": checkpoint_id, "attempt": retry_count},
             )
         for command in repair_commands:
             rc, output = run_shell(command, root)
             append_event(
                 run_dir,
                 {
-                    "type": repair_event_type,
+                    "type": config.repair_event_type,
                     "checkpoint_id": checkpoint_id,
                     "attempt": retry_count,
                     "command": command,
@@ -110,14 +116,14 @@ def process_checkpoint(
             root,
             checkpoint_id,
             validation_commands,
-            phase=retry_phase,
+            phase=config.retry_phase,
         )
 
     if success:
-        if resolve_blockers_on_success:
+        if config.resolve_blockers_on_success:
             resolve_blockers_for_checkpoint(run_dir / "blockers.md", checkpoint_id)
         state["checkpoint_status"][checkpoint_id] = "passed"
-        if emit_checkpoint_passed_event:
+        if config.emit_checkpoint_passed_event:
             append_event(run_dir, {"type": "checkpoint_passed", "checkpoint_id": checkpoint_id})
         return blocker_seq, False
 
@@ -159,7 +165,7 @@ def process_checkpoint(
     if blocker_type in hard_stop_types or is_repo_integrity_failure(failed_commands):
         state["checkpoint_status"][checkpoint_id] = "failed_terminal"
         state["status"] = "blocked"
-        if emit_blocker_events:
+        if config.emit_blocker_events:
             append_event(
                 run_dir,
                 {
@@ -172,7 +178,7 @@ def process_checkpoint(
         return blocker_seq, True
 
     state["checkpoint_status"][checkpoint_id] = "blocked_with_placeholder"
-    if emit_blocker_events:
+    if config.emit_blocker_events:
         append_event(
             run_dir,
             {

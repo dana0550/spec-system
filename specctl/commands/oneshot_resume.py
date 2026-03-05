@@ -7,7 +7,7 @@ from specctl.commands.oneshot_common import (
     read_run_state,
     write_run_state,
 )
-from specctl.commands.oneshot_runtime import finalize_run_status, process_checkpoint, write_summary
+from specctl.commands.oneshot_runtime import CheckpointExecutionConfig, finalize_run_status, process_checkpoint, write_summary
 from specctl.oneshot_utils import parse_blockers, write_memory_files
 
 
@@ -50,6 +50,20 @@ def run(args) -> int:
     repair_commands = repair_policy.get("commands", [])
     if not isinstance(repair_commands, list):
         repair_commands = []
+    resume_config = CheckpointExecutionConfig(
+        prompt_suffix=".resume.prompt.md",
+        checkpoint_event_type="checkpoint_resume",
+        checkpoint_event_extra=None,
+        runner_event_type="runner_resume_invocation",
+        runner_fallback_output="Runner command not configured; validation-only resume.",
+        repair_attempt_event_type=None,
+        repair_event_type="repair_command_resume",
+        validation_phase="resume",
+        retry_phase="resume-retry",
+        resolve_blockers_on_success=True,
+        emit_checkpoint_passed_event=False,
+        emit_blocker_events=False,
+    )
     blocker_seq = len(parse_blockers(run_dir / "blockers.md"))
 
     attempted_checkpoints: set[str] = set()
@@ -83,18 +97,7 @@ def run(args) -> int:
                 max_retries=max_retries,
                 hard_stop_types=hard_stop_types,
                 blocker_seq=blocker_seq,
-                prompt_suffix=".resume.prompt.md",
-                checkpoint_event_type="checkpoint_resume",
-                checkpoint_event_extra=None,
-                runner_event_type="runner_resume_invocation",
-                runner_fallback_output="Runner command not configured; validation-only resume.",
-                repair_attempt_event_type=None,
-                repair_event_type="repair_command_resume",
-                validation_phase="resume",
-                retry_phase="resume-retry",
-                resolve_blockers_on_success=True,
-                emit_checkpoint_passed_event=False,
-                emit_blocker_events=False,
+                config=resume_config,
             )
             if hard_stopped:
                 break

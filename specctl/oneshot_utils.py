@@ -206,9 +206,8 @@ def collect_run_stats(runs_dir: Path) -> dict[str, int]:
         totals["runs_total"] += 1
         state_path = run_dir / "state.json"
         if state_path.exists():
-            try:
-                state = json.loads(state_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
+            state, err = load_json_document(state_path)
+            if err or state is None:
                 state = {}
             if state.get("status") in {"running", "stabilizing"}:
                 totals["active_runs"] += 1
