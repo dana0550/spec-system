@@ -63,7 +63,11 @@ def run(args) -> int:
             checkpoint_id = checkpoint.get("checkpoint_id", "")
             if checkpoint_id in attempted_checkpoints:
                 continue
-            if state["checkpoint_status"].get(checkpoint_id) not in {"pending", "blocked_with_placeholder"}:
+            if state["checkpoint_status"].get(checkpoint_id) not in {
+                "pending",
+                "in_progress",
+                "blocked_with_placeholder",
+            }:
                 continue
             deps = checkpoint.get("depends_on", [])
             if any(state["checkpoint_status"].get(dep) != "passed" for dep in deps):

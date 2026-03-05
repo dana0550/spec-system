@@ -132,6 +132,13 @@ def run(args) -> int:
     brief_path = epic_dir / "brief.md"
     product_map_path = root / "docs" / "PRODUCT_MAP.md"
     traceability_path = root / "docs" / "TRACEABILITY.md"
+    state_path = run_dir / "state.json"
+    memory_dir = epic_dir / "memory"
+    memory_state_path = memory_dir / "state.json"
+    decisions_path = memory_dir / "decisions.md"
+    open_threads_path = memory_dir / "open_threads.md"
+    resume_pack_path = memory_dir / "resume_pack.md"
+    finalization_path = run_dir / "finalization.md"
     try:
         # Snapshot shared finalize outputs up front so any mid-flight failure
         # can restore a fully consistent docs state.
@@ -139,6 +146,12 @@ def run(args) -> int:
         _snapshot(epics_path)
         _snapshot(product_map_path)
         _snapshot(traceability_path)
+        _snapshot(state_path)
+        _snapshot(memory_state_path)
+        _snapshot(decisions_path)
+        _snapshot(open_threads_path)
+        _snapshot(resume_pack_path)
+        _snapshot(finalization_path)
         if brief_path.exists():
             _snapshot(brief_path)
 
@@ -166,41 +179,40 @@ def run(args) -> int:
             _rollback()
             print("[ERROR] Failed to render generated docs after finalization")
             return 1
+
+        if state_path.exists():
+            try:
+                state = read_run_state(run_dir)
+            except ValueError as exc:
+                raise RuntimeError(str(exc)) from exc
+        else:
+            state = {"checkpoint_status": {}}
+        state["status"] = "completed"
+        state["completed_at"] = now_date()
+        write_run_state(run_dir, state)
+        write_memory_files(memory_dir, state, [])
+
+        write_text(
+            finalization_path,
+            "\n".join(
+                [
+                    "# Finalization Summary",
+                    "",
+                    f"- Date: {now_date()}",
+                    f"- Epic ID: {epic.epic_id}",
+                    f"- Run ID: {args.run_id}",
+                    f"- Scoped features marked done: {len(scope_set)}",
+                    "- Open blockers: 0",
+                    "- Placeholder leakage: 0",
+                    "",
+                ]
+            )
+            + "\n",
+        )
     except Exception as exc:
         _rollback()
         print(f"[ERROR] Failed to finalize run changes: {exc}")
         return 1
 
-    state_path = run_dir / "state.json"
-    if state_path.exists():
-        try:
-            state = read_run_state(run_dir)
-        except ValueError as exc:
-            print(f"[ERROR] {exc}")
-            return 1
-    else:
-        state = {"checkpoint_status": {}}
-    state["status"] = "completed"
-    state["completed_at"] = now_date()
-    write_run_state(run_dir, state)
-    write_memory_files(epic_dir / "memory", state, [])
-
-    write_text(
-        run_dir / "finalization.md",
-        "\n".join(
-            [
-                "# Finalization Summary",
-                "",
-                f"- Date: {now_date()}",
-                f"- Epic ID: {epic.epic_id}",
-                f"- Run ID: {args.run_id}",
-                f"- Scoped features marked done: {len(scope_set)}",
-                "- Open blockers: 0",
-                "- Placeholder leakage: 0",
-                "",
-            ]
-        )
-        + "\n",
-    )
     print(f"Finalized one-shot run {args.run_id} for epic {epic.epic_id}")
     return 0

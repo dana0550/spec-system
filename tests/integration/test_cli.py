@@ -920,6 +920,53 @@ def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monke
     assert requirements_path.read_text(encoding="utf-8") == requirements_before
 
 
+def test_oneshot_finalize_rolls_back_when_run_state_is_invalid(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "StateRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+    features_before = features_path.read_text(encoding="utf-8")
+    epics_before = epics_path.read_text(encoding="utf-8")
+
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    scope_row = next(row for row in read_feature_rows(features_path) if row.feature_id in scope_ids)
+    requirements_path = (root / "docs" / scope_row.spec_path).parent / "requirements.md"
+    requirements_before = requirements_path.read_text(encoding="utf-8")
+
+    (run_dir / "state.json").write_text("{invalid-json", encoding="utf-8")
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    assert features_path.read_text(encoding="utf-8") == features_before
+    assert epics_path.read_text(encoding="utf-8") == epics_before
+    assert requirements_path.read_text(encoding="utf-8") == requirements_before
+
+
 def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -963,6 +1010,58 @@ def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path)
     assert blockers
     assert all(row["status"] != "open" for row in blockers)
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+
+def test_oneshot_resume_processes_in_progress_checkpoint(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeInProgressFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["true"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    checkpoint_ids = [entry["checkpoint_id"] for entry in payload["checkpoint_graph"]]
+    state_path = run_dir / "state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["status"] = "running"
+    state["checkpoint_status"] = {
+        checkpoint_id: ("in_progress" if index == 0 else "pending")
+        for index, checkpoint_id in enumerate(checkpoint_ids)
+    }
+    state["last_checkpoint"] = checkpoint_ids[0]
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+    resumed_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert resumed_state["status"] == "ready_to_finalize"
+    assert all(value == "passed" for value in resumed_state["checkpoint_status"].values())
 
 
 def test_oneshot_run_retries_pending_checkpoints_after_late_dependency_pass(tmp_path: Path) -> None:
