@@ -12,7 +12,9 @@ from specctl.commands import check as check_command
 from specctl.commands import epic_create as epic_create_command
 from specctl.commands import oneshot_finalize as oneshot_finalize_command
 from specctl.commands import render as render_command
+from specctl.commands import report as report_command
 from specctl.feature_index import read_feature_rows
+from specctl.models import OneShotStats, TraceabilityStats
 from specctl.oneshot_utils import parse_blockers
 from specctl.validators.project import lint_project as real_lint_project
 
@@ -417,6 +419,20 @@ def test_check_reuses_lint_stats_for_render(tmp_path: Path, monkeypatch) -> None
     assert main(["check", "--root", str(root)]) == 0
     assert calls["check"] == 1
     assert calls["render"] == 0
+
+
+def test_report_json_includes_runs_total(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+
+    def lint_stub(_root: Path):
+        return [], TraceabilityStats(), OneShotStats(epics_total=2, runs_total=7)
+
+    monkeypatch.setattr(report_command, "lint_project", lint_stub)
+    assert main(["report", "--root", str(root), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["epics_total"] == 2
+    assert payload["runs_total"] == 7
 
 
 def test_done_status_with_evidence_passes_check(tmp_path: Path) -> None:

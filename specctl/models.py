@@ -48,6 +48,7 @@ class TraceabilityStats:
 @dataclass
 class OneShotStats:
     epics_total: int = 0
+    runs_total: int = 0
     active_runs: int = 0
     checkpoints_passed: int = 0
     checkpoints_failed: int = 0

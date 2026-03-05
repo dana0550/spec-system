@@ -105,6 +105,7 @@ def validate_epics(root: Path, feature_rows: list[FeatureRow]) -> tuple[list[Lin
 
         messages.extend(validate_run_artifacts(epic_dir))
         run_stats = collect_run_stats(epic_dir / "runs")
+        stats.runs_total += run_stats["runs_total"]
         stats.active_runs += run_stats["active_runs"]
         stats.checkpoints_passed += run_stats["checkpoints_passed"]
         stats.checkpoints_failed += run_stats["checkpoints_failed"]

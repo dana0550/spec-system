@@ -21,6 +21,7 @@ def run(args) -> int:
         "scenarios_total": stats.scenarios_total,
         "scenarios_with_evidence": stats.scenarios_with_evidence,
         "epics_total": oneshot_stats.epics_total,
+        "runs_total": oneshot_stats.runs_total,
         "active_runs": oneshot_stats.active_runs,
         "checkpoints_passed": oneshot_stats.checkpoints_passed,
         "checkpoints_failed": oneshot_stats.checkpoints_failed,

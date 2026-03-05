@@ -3,16 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from specctl.commands.oneshot_common import (
-    append_event,
     load_epic_and_contract,
     read_run_state,
-    run_shell,
     write_run_state,
 )
-from specctl.commands.oneshot_run import _build_scoped_prompt, _is_repo_integrity_failure, _run_validation_group, _write_summary
-from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
-from specctl.io_utils import write_text
-from specctl.oneshot_utils import append_blocker, blocker_id, parse_blockers, resolve_blockers_for_checkpoint, write_memory_files
+from specctl.commands.oneshot_run import _finalize_run_status, _process_checkpoint, _write_summary
+from specctl.oneshot_utils import parse_blockers, write_memory_files
 
 
 def run(args) -> int:
@@ -75,114 +71,37 @@ def run(args) -> int:
 
             progressed = True
             attempted_checkpoints.add(checkpoint_id)
-            state["checkpoint_status"][checkpoint_id] = "in_progress"
-            state["last_checkpoint"] = checkpoint_id
-            append_event(run_dir, {"type": "checkpoint_resume", "checkpoint_id": checkpoint_id})
-            prompt_path = run_dir / f"{checkpoint_id}.resume.prompt.md"
-            prompt_text = _build_scoped_prompt(epic.epic_id, state["run_id"], checkpoint)
-            write_text(prompt_path, prompt_text)
-            runner_command = checkpoint.get("runner_command") or contract.get("runner_command")
-            if isinstance(runner_command, str) and runner_command.strip():
-                rc, output = run_shell(runner_command, root)
-                append_event(
-                    run_dir,
-                    {
-                        "type": "runner_resume_invocation",
-                        "checkpoint_id": checkpoint_id,
-                        "command": runner_command,
-                        "prompt_path": str(prompt_path),
-                        "rc": rc,
-                        "output": output[-3000:],
-                    },
-                )
-            else:
-                append_event(
-                    run_dir,
-                    {
-                        "type": "runner_resume_invocation",
-                        "checkpoint_id": checkpoint_id,
-                        "command": "",
-                        "prompt_path": str(prompt_path),
-                        "rc": 0,
-                        "output": "Runner command not configured; validation-only resume.",
-                    },
-                )
-
-            validation_commands = checkpoint.get("validation_commands", contract.get("validation_commands", []))
-            if not isinstance(validation_commands, list):
-                validation_commands = []
-            success, failed_commands = _run_validation_group(
-                run_dir,
-                root,
-                checkpoint_id,
-                validation_commands,
-                phase="resume",
+            blocker_seq, hard_stopped = _process_checkpoint(
+                run_dir=run_dir,
+                root=root,
+                epic=epic,
+                contract=contract,
+                checkpoint=checkpoint,
+                checkpoint_id=checkpoint_id,
+                state=state,
+                repair_commands=repair_commands,
+                max_retries=max_retries,
+                hard_stop_types=hard_stop_types,
+                blocker_seq=blocker_seq,
+                prompt_suffix=".resume.prompt.md",
+                checkpoint_event_type="checkpoint_resume",
+                checkpoint_event_extra=None,
+                runner_event_type="runner_resume_invocation",
+                runner_fallback_output="Runner command not configured; validation-only resume.",
+                repair_attempt_event_type=None,
+                repair_event_type="repair_command_resume",
+                validation_phase="resume",
+                retry_phase="resume-retry",
+                resolve_blockers_on_success=True,
+                emit_checkpoint_passed_event=False,
+                emit_blocker_events=False,
             )
-            retry_count = 0
-            while not success and retry_count < max_retries:
-                retry_count += 1
-                for command in repair_commands:
-                    rc, output = run_shell(command, root)
-                    append_event(
-                        run_dir,
-                        {
-                            "type": "repair_command_resume",
-                            "checkpoint_id": checkpoint_id,
-                            "attempt": retry_count,
-                            "command": command,
-                            "rc": rc,
-                            "output": output[-2000:],
-                        },
-                    )
-                success, failed_commands = _run_validation_group(
-                    run_dir,
-                    root,
-                    checkpoint_id,
-                    validation_commands,
-                    phase="resume-retry",
-                )
-
-            if success:
-                resolve_blockers_for_checkpoint(run_dir / "blockers.md", checkpoint_id)
-                state["checkpoint_status"][checkpoint_id] = "passed"
-                continue
-
-            blocker_seq += 1
-            current_blocker_id = blocker_id(epic.epic_id, blocker_seq)
-            placeholder = f"{ONESHOT_PLACEHOLDER_PREFIX}{current_blocker_id}"
-            blocker_type = checkpoint.get("blocker_type", "implementation_gap")
-            task_ids = checkpoint.get("task_ids", [])
-            feature_id = checkpoint.get("feature_id", epic.root_feature_id)
-            append_blocker(
-                run_dir / "blockers.md",
-                {
-                    "blocker_id": current_blocker_id,
-                    "checkpoint_id": checkpoint_id,
-                    "feature_id": feature_id,
-                    "task_id": task_ids[0] if task_ids else "",
-                    "severity": "high",
-                    "type": blocker_type,
-                    "placeholder_marker": placeholder,
-                    "owner": epic.owner,
-                    "exit_criteria": "Checkpoint validations pass without retries",
-                    "status": "open",
-                },
-            )
-            if blocker_type in hard_stop_types or _is_repo_integrity_failure(failed_commands):
-                state["checkpoint_status"][checkpoint_id] = "failed_terminal"
-                state["status"] = "blocked"
+            if hard_stopped:
                 break
-            state["checkpoint_status"][checkpoint_id] = "blocked_with_placeholder"
         if not progressed:
             break
 
-    if state.get("status") != "blocked":
-        if any(value == "blocked_with_placeholder" for value in state["checkpoint_status"].values()):
-            state["status"] = "stabilizing"
-        elif all(value == "passed" for value in state["checkpoint_status"].values()):
-            state["status"] = "ready_to_finalize"
-        else:
-            state["status"] = "stabilizing"
+    _finalize_run_status(state)
 
     write_run_state(run_dir, state)
     blockers = parse_blockers(run_dir / "blockers.md")

@@ -168,3 +168,15 @@ def test_parse_task_ids_accepts_variable_width_suffix() -> None:
     assert "T-F001-001" in ids
     assert "T-F001-1000" in ids
     assert "T-F001.01-1001" in ids
+
+
+def test_parse_task_ids_accepts_variable_width_dotted_segments() -> None:
+    text = "\n".join(
+        [
+            "- [ ] T-F001.1-001 single-digit segment",
+            "- [ ] T-F001.010-001 triple-digit segment",
+        ]
+    )
+    ids = parse_task_ids(text)
+    assert "T-F001.1-001" in ids
+    assert "T-F001.010-001" in ids
