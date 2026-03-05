@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+import yaml
 
 from specctl.cli import main
 from specctl.oneshot_utils import needs_ui_components
@@ -69,12 +70,12 @@ def test_oneshot_check_rejects_checkpoint_cycles(tmp_path: Path) -> None:
         == 0
     )
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
-    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     graph = payload["checkpoint_graph"]
     graph[0]["depends_on"] = [graph[1]["checkpoint_id"]]
     graph[1]["depends_on"] = [graph[0]["checkpoint_id"]]
     payload["checkpoint_graph"] = graph
-    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
     assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
 
 

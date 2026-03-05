@@ -31,11 +31,12 @@ def run(args) -> int:
     import json
 
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    if state.get("status") not in {"running", "stabilizing", "blocked"}:
-        print(f"[ERROR] Run {args.run_id} is not resumable from status '{state.get('status')}'")
-        return 1
-    if state.get("status") == "blocked":
+    status = state.get("status")
+    if status == "blocked":
         print(f"[ERROR] Run {args.run_id} is hard-blocked and cannot resume")
+        return 1
+    if status not in {"running", "stabilizing"}:
+        print(f"[ERROR] Run {args.run_id} is not resumable from status '{state.get('status')}'")
         return 1
 
     checkpoints = contract.get("checkpoint_graph", [])

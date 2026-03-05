@@ -109,6 +109,12 @@ def run(args) -> int:
             print(format_message(message))
         return 1
 
+    rollback_contents: dict[Path, str] = {}
+
+    def _snapshot(path: Path) -> None:
+        if path.exists() and path not in rollback_contents:
+            rollback_contents[path] = path.read_text(encoding="utf-8")
+
     scope_set = set(contract.get("scope_feature_ids", []))
     for row in feature_rows:
         if row.feature_id in scope_set:
@@ -117,20 +123,28 @@ def run(args) -> int:
             for name in ["requirements.md", "design.md", "tasks.md", "verification.md"]:
                 path = feature_dir / name
                 if path.exists():
+                    _snapshot(path)
                     set_frontmatter_value(path, "status", "done")
-    write_feature_rows(root / "docs" / "FEATURES.md", feature_rows, version="2.1.0")
+    features_path = root / "docs" / "FEATURES.md"
+    _snapshot(features_path)
+    write_feature_rows(features_path, feature_rows, version="2.1.0")
 
-    epic_rows = read_epic_rows(root / "docs" / "EPICS.md")
+    epics_path = root / "docs" / "EPICS.md"
+    epic_rows = read_epic_rows(epics_path)
     for row in epic_rows:
         if row.epic_id == epic.epic_id:
             row.status = "done"
-    write_epic_rows(root / "docs" / "EPICS.md", epic_rows, version="2.1.0")
+    _snapshot(epics_path)
+    write_epic_rows(epics_path, epic_rows, version="2.1.0")
     brief_path = epic_dir / "brief.md"
     if brief_path.exists():
+        _snapshot(brief_path)
         set_frontmatter_value(brief_path, "status", "done")
 
     render_rc = render.run(Namespace(root=str(root), check=False))
     if render_rc != 0:
+        for path, original_text in rollback_contents.items():
+            write_text(path, original_text)
         print("[ERROR] Failed to render generated docs after finalization")
         return 1
 

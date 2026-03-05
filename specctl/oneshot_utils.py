@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import escape_markdown_table_cell, now_date, now_timestamp, split_markdown_table_row, write_text
 
@@ -30,8 +32,12 @@ def load_json_document(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     if not path.exists():
         return None, f"Missing file: {path}"
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
+        raw = path.read_text(encoding="utf-8")
+        if path.suffix in {".yaml", ".yml"}:
+            data = yaml.safe_load(raw)
+        else:
+            data = json.loads(raw)
+    except (json.JSONDecodeError, yaml.YAMLError) as exc:
         return None, f"Invalid JSON/YAML payload in {path}: {exc}"
     if not isinstance(data, dict):
         return None, f"Expected object at root in {path}"
@@ -39,7 +45,11 @@ def load_json_document(path: Path) -> tuple[dict[str, Any] | None, str | None]:
 
 
 def dump_json_document(path: Path, payload: dict[str, Any]) -> None:
-    write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    if path.suffix in {".yaml", ".yml"}:
+        text = yaml.safe_dump(payload, sort_keys=True, allow_unicode=False)
+    else:
+        text = json.dumps(payload, indent=2, sort_keys=True)
+    write_text(path, text.rstrip("\n") + "\n")
 
 
 def parse_brief_sections(text: str) -> dict[str, str]:

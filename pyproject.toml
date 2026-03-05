@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "docs-spec-system" }]
 keywords = ["spec", "documentation", "llm", "requirements", "traceability"]
+dependencies = ["PyYAML>=6.0"]
 
 [project.scripts]
 specctl = "specctl.cli:main"

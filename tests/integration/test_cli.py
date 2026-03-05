@@ -5,6 +5,8 @@ import re
 import shutil
 from pathlib import Path
 
+import yaml
+
 from specctl.cli import main
 from specctl.commands import check as check_command
 from specctl.commands import epic_create as epic_create_command
@@ -555,7 +557,7 @@ def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None
     assert any(row.feature_id == "F-001.01.05" for row in rows)
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
-    oneshot = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    oneshot = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     assert oneshot["epic_id"] == "E-001"
     assert len(oneshot["scope_feature_ids"]) == 13
     assert len(oneshot["checkpoint_graph"]) == 13
@@ -614,9 +616,9 @@ def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) ->
         == 0
     )
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
-    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     payload["validation_commands"] = []
-    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
     assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
 
 
@@ -645,13 +647,13 @@ def test_oneshot_run_uses_soft_blocker_for_non_integrity_failure(tmp_path: Path)
     )
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
-    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     payload["repair_policy"]["max_retries_per_checkpoint"] = 0
     payload["checkpoint_graph"][0]["validation_commands"] = [
         "python -c \"import sys; sys.exit(0)\"",
         "python -c \"import sys; sys.exit(1)\"",
     ]
-    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
     run_dir = next((epic_dir / "runs").iterdir())
@@ -686,11 +688,11 @@ def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path:
     )
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
-    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     payload["validation_commands"] = []
     for checkpoint in payload["checkpoint_graph"]:
         checkpoint["validation_commands"] = []
-    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
     run_dir = next((epic_dir / "runs").iterdir())
@@ -733,7 +735,7 @@ def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
     epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
     assert "| E-001 | FinalizeFlow | done |" in epics_text
     rows = read_feature_rows(root / "docs" / "FEATURES.md")
-    scope_ids = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
     for row in rows:
         if row.feature_id in scope_ids:
             assert row.status == "done"
@@ -763,9 +765,9 @@ def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
         == 0
     )
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
-    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     payload["validation_commands"] = ["false"]
-    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
     run_dir = next((epic_dir / "runs").iterdir())
