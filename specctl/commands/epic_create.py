@@ -226,7 +226,10 @@ def run(args) -> int:
     write_text(epic_dir / "memory" / "decisions.md", "# Decisions\n\n- Epic scaffold generated.\n")
     write_text(epic_dir / "memory" / "open_threads.md", "# Open Threads\n\n- None\n")
 
-    render.run(Namespace(root=str(root), check=False))
+    render_rc = render.run(Namespace(root=str(root), check=False))
+    if render_rc != 0:
+        print("[ERROR] Failed to render generated docs after epic creation")
+        return 1
 
     print(f"Created epic {epic_id} at {epic_dir}")
     print(f"Created {len(created_rows)} features in scope rooted at {root_row.feature_id}")
