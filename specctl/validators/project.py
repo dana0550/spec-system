@@ -70,6 +70,9 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
                 )
         messages.extend(validate_feature_hierarchy(rows, features_index_path))
 
+    epic_messages, oneshot_stats = validate_epics(root, rows)
+    messages.extend(epic_messages)
+
     features_root = docs_dir / "features"
     if not features_root.exists():
         messages.append(
@@ -119,8 +122,6 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
                 )
             )
 
-    epic_messages, oneshot_stats = validate_epics(root, rows)
-    messages.extend(epic_messages)
     return messages, stats, oneshot_stats
 
 

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
 from specctl.constants import EPIC_STATUSES
 from specctl.epic_index import read_epic_rows
 from specctl.models import FeatureRow, LintMessage, OneShotStats
-from specctl.oneshot_utils import parse_blockers, scan_placeholder_markers
+from specctl.oneshot_utils import collect_run_stats, scan_placeholder_markers
 from specctl.validators.oneshot import validate_oneshot_contract, validate_run_artifacts
 
 
@@ -105,7 +104,12 @@ def validate_epics(root: Path, feature_rows: list[FeatureRow]) -> tuple[list[Lin
         messages.extend(oneshot_msgs)
 
         messages.extend(validate_run_artifacts(epic_dir))
-        _aggregate_run_stats(epic_dir, stats)
+        run_stats = collect_run_stats(epic_dir / "runs")
+        stats.active_runs += run_stats["active_runs"]
+        stats.checkpoints_passed += run_stats["checkpoints_passed"]
+        stats.checkpoints_failed += run_stats["checkpoints_failed"]
+        stats.blockers_opened += run_stats["blockers_opened"]
+        stats.blockers_resolved += run_stats["blockers_resolved"]
 
     placeholder_hits = scan_placeholder_markers(root, exclude_prefixes=[docs / "epics"])
     stats.placeholder_leakage_count += len(placeholder_hits)
@@ -123,33 +127,3 @@ def validate_epics(root: Path, feature_rows: list[FeatureRow]) -> tuple[list[Lin
         )
 
     return messages, stats
-
-
-def _aggregate_run_stats(epic_dir: Path, stats: OneShotStats) -> None:
-    runs_dir = epic_dir / "runs"
-    if not runs_dir.exists():
-        return
-    for run_dir in runs_dir.iterdir():
-        if not run_dir.is_dir():
-            continue
-        state_path = run_dir / "state.json"
-        if state_path.exists():
-            try:
-                payload = json.loads(state_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                payload = {}
-            status = payload.get("status", "")
-            if status in {"running", "stabilizing"}:
-                stats.active_runs += 1
-            checkpoint_status = payload.get("checkpoint_status", {})
-            if isinstance(checkpoint_status, dict):
-                stats.checkpoints_passed += sum(1 for value in checkpoint_status.values() if value == "passed")
-                stats.checkpoints_failed += sum(
-                    1 for value in checkpoint_status.values() if value in {"failed_terminal", "blocked_with_placeholder"}
-                )
-        blockers_path = run_dir / "blockers.md"
-        for blocker in parse_blockers(blockers_path):
-            if blocker["status"] == "open":
-                stats.blockers_opened += 1
-            if blocker["status"] == "resolved":
-                stats.blockers_resolved += 1

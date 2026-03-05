@@ -228,7 +228,7 @@ def run(args) -> int:
 
     render_rc = render.run(Namespace(root=str(root), check=False))
     if render_rc != 0:
-        print("[ERROR] Failed to render generated docs after epic creation")
+        print("[ERROR] Failed to render project docs after epic creation.")
         return 1
 
     print(f"Created epic {epic_id} at {epic_dir}")

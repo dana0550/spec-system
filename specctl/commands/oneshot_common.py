@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -31,10 +32,20 @@ def append_event(run_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def run_shell(command: str, root: Path) -> tuple[int, str]:
+    stripped = command.strip()
+    if not stripped:
+        return 1, "Empty command."
+    try:
+        argv = shlex.split(stripped)
+    except ValueError as exc:
+        return 1, f"Invalid command syntax: {exc}"
+    if not argv:
+        return 1, "Empty command."
+
     proc = subprocess.run(
-        command,
+        argv,
         cwd=root,
-        shell=True,
+        shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

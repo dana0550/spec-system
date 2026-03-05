@@ -138,6 +138,43 @@ def append_blocker(path: Path, row: dict[str, str]) -> None:
         handle.write(line + "\n")
 
 
+def collect_run_stats(runs_dir: Path) -> dict[str, int]:
+    totals = {
+        "runs_total": 0,
+        "active_runs": 0,
+        "checkpoints_passed": 0,
+        "checkpoints_failed": 0,
+        "blockers_opened": 0,
+        "blockers_resolved": 0,
+    }
+    if not runs_dir.exists():
+        return totals
+
+    for run_dir in sorted(path for path in runs_dir.iterdir() if path.is_dir()):
+        totals["runs_total"] += 1
+        state_path = run_dir / "state.json"
+        if state_path.exists():
+            try:
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                state = {}
+            if state.get("status") in {"running", "stabilizing"}:
+                totals["active_runs"] += 1
+            checkpoint_status = state.get("checkpoint_status", {})
+            if isinstance(checkpoint_status, dict):
+                totals["checkpoints_passed"] += sum(1 for value in checkpoint_status.values() if value == "passed")
+                totals["checkpoints_failed"] += sum(
+                    1 for value in checkpoint_status.values() if value in {"failed_terminal", "blocked_with_placeholder"}
+                )
+
+        for blocker in parse_blockers(run_dir / "blockers.md"):
+            if blocker["status"] == "open":
+                totals["blockers_opened"] += 1
+            if blocker["status"] == "resolved":
+                totals["blockers_resolved"] += 1
+    return totals
+
+
 def write_memory_files(memory_dir: Path, state: dict[str, Any], open_blockers: list[dict[str, str]]) -> None:
     memory_dir.mkdir(parents=True, exist_ok=True)
     state_path = memory_dir / "state.json"

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from specctl.cli import main
 from specctl.commands import check as check_command
+from specctl.commands import epic_create as epic_create_command
 from specctl.commands import render as render_command
 from specctl.feature_index import read_feature_rows
 from specctl.validators.project import lint_project as real_lint_project
@@ -562,6 +563,33 @@ def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None
     assert oneshot["checkpoint_graph"][1]["depends_on"] == [oneshot["checkpoint_graph"][0]["checkpoint_id"]]
 
 
+def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+
+    monkeypatch.setattr(epic_create_command.render, "run", lambda _args: 1)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "RenderFailure",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 1
+    )
+
+
 def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -590,6 +618,86 @@ def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) ->
     payload["validation_commands"] = []
     (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
+
+
+def test_oneshot_run_uses_soft_blocker_for_non_integrity_failure(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "SoftBlockerFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["repair_policy"]["max_retries_per_checkpoint"] = 0
+    payload["checkpoint_graph"][0]["validation_commands"] = [
+        "python -c \"import sys; sys.exit(0)\"",
+        "python -c \"import sys; sys.exit(1)\"",
+    ]
+    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    first_checkpoint = payload["checkpoint_graph"][0]["checkpoint_id"]
+    assert state["status"] == "stabilizing"
+    assert state["checkpoint_status"][first_checkpoint] == "blocked_with_placeholder"
+
+
+def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "EmptyValidationFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = json.loads((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = []
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = []
+    (epic_dir / "oneshot.yaml").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    blockers = (run_dir / "blockers.md").read_text(encoding="utf-8")
+    assert state["status"] == "ready_to_finalize"
+    assert "B-E001-" not in blockers
 
 
 def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
