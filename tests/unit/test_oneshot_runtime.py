@@ -37,8 +37,12 @@ def test_validation_group_empty_commands_is_success(tmp_path: Path) -> None:
 
 
 def test_repo_integrity_failure_checks_failed_commands_only() -> None:
+    assert _is_repo_integrity_failure(["specctl check --root ."]) is True
     assert _is_repo_integrity_failure(["python -m specctl.cli check --root ."]) is True
+    assert _is_repo_integrity_failure(["python3 -m specctl.cli check --root ."]) is True
     assert _is_repo_integrity_failure(["python -c \"import sys; sys.exit(1)\""]) is False
+    assert _is_repo_integrity_failure(["echo specctl check"]) is False
+    assert _is_repo_integrity_failure(["./run-specctl-check-suite.sh"]) is False
 
 
 def test_blocker_ledger_roundtrips_pipe_characters(tmp_path: Path) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -334,11 +335,22 @@ def _run_validation_group(
 
 
 def _is_repo_integrity_failure(failed_commands: list[str]) -> bool:
-    critical = (
-        "specctl check",
-        "python -m specctl.cli check",
-    )
-    return any(any(token in command for token in critical) for command in failed_commands)
+    for command in failed_commands:
+        try:
+            tokens = shlex.split(command)
+        except ValueError:
+            continue
+        if len(tokens) >= 2 and tokens[0] == "specctl" and tokens[1] == "check":
+            return True
+        if (
+            len(tokens) >= 4
+            and tokens[0] in {"python", "python3"}
+            and tokens[1] == "-m"
+            and tokens[2] == "specctl.cli"
+            and tokens[3] == "check"
+        ):
+            return True
+    return False
 
 
 def _write_summary(run_dir: Path, state: dict, blockers: list[dict[str, str]]) -> None:

@@ -187,9 +187,7 @@ def run(args) -> int:
         render_stats = collect_traceability_stats(root / "docs", feature_rows)
         render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
         if render_rc != 0:
-            _rollback()
-            print("[ERROR] Failed to render generated docs after finalization")
-            return 1
+            raise RuntimeError("Failed to render generated docs after finalization")
 
         if state_path.exists():
             try:
@@ -221,7 +219,10 @@ def run(args) -> int:
             + "\n",
         )
     except Exception as exc:
-        _rollback()
+        try:
+            _rollback()
+        except Exception as rollback_exc:
+            print(f"[ERROR] Rollback failed during finalize: {rollback_exc}")
         print(f"[ERROR] Failed to finalize run changes: {exc}")
         return 1
 
