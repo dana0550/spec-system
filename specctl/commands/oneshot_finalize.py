@@ -9,8 +9,13 @@ from specctl.commands.oneshot_common import load_epic_and_contract, read_run_sta
 from specctl.epic_index import read_epic_rows, write_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
 from specctl.io_utils import now_date, set_frontmatter_value, write_text
-from specctl.models import LintMessage, TraceabilityStats
-from specctl.oneshot_utils import parse_blockers, scan_placeholder_markers, write_memory_files
+from specctl.models import LintMessage
+from specctl.oneshot_utils import (
+    collect_traceability_stats,
+    parse_blockers,
+    scan_placeholder_markers,
+    write_memory_files,
+)
 from specctl.validators.traceability import validate_feature_traceability
 
 
@@ -174,7 +179,7 @@ def run(args) -> int:
         if brief_path.exists():
             set_frontmatter_value(brief_path, "status", "done")
 
-        render_stats = _collect_traceability_stats(root, feature_rows)
+        render_stats = collect_traceability_stats(root / "docs", feature_rows)
         render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
         if render_rc != 0:
             _rollback()
@@ -217,19 +222,3 @@ def run(args) -> int:
 
     print(f"Finalized one-shot run {args.run_id} for epic {epic.epic_id}")
     return 0
-
-
-def _collect_traceability_stats(root: Path, feature_rows) -> TraceabilityStats:
-    stats = TraceabilityStats()
-    docs = root / "docs"
-    for row in feature_rows:
-        feature_dir = (docs / row.spec_path).parent
-        if not feature_dir.exists():
-            continue
-        _, trace_stats = validate_feature_traceability(feature_dir)
-        stats.requirements_total += trace_stats.requirements_total
-        stats.requirements_with_design += trace_stats.requirements_with_design
-        stats.requirements_with_tasks += trace_stats.requirements_with_tasks
-        stats.scenarios_total += trace_stats.scenarios_total
-        stats.scenarios_with_evidence += trace_stats.scenarios_with_evidence
-    return stats

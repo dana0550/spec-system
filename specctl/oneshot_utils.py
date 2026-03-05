@@ -10,6 +10,8 @@ import yaml
 
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import escape_markdown_table_cell, now_date, now_timestamp, split_markdown_table_row, write_text
+from specctl.models import FeatureRow, TraceabilityStats
+from specctl.validators.traceability import validate_feature_traceability
 
 
 REQUIRED_BRIEF_SECTIONS = ["Vision", "Outcomes", "User Journeys", "Constraints", "Non-Goals"]
@@ -222,6 +224,21 @@ def collect_run_stats(runs_dir: Path) -> dict[str, int]:
             if blocker["status"] == "resolved":
                 totals["blockers_resolved"] += 1
     return totals
+
+
+def collect_traceability_stats(docs: Path, feature_rows: list[FeatureRow]) -> TraceabilityStats:
+    stats = TraceabilityStats()
+    for row in feature_rows:
+        feature_dir = (docs / row.spec_path).parent
+        if not feature_dir.exists():
+            continue
+        _, trace_stats = validate_feature_traceability(feature_dir)
+        stats.requirements_total += trace_stats.requirements_total
+        stats.requirements_with_design += trace_stats.requirements_with_design
+        stats.requirements_with_tasks += trace_stats.requirements_with_tasks
+        stats.scenarios_total += trace_stats.scenarios_total
+        stats.scenarios_with_evidence += trace_stats.scenarios_with_evidence
+    return stats
 
 
 def write_memory_files(memory_dir: Path, state: dict[str, Any], open_blockers: list[dict[str, str]]) -> None:
