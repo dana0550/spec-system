@@ -55,9 +55,13 @@ def run(args) -> int:
             )
         )
 
+    required_finalize_commands = contract.get("finalize_gates", {}).get(
+        "required_validation_commands"
+    )
     finalize_commands = (
-        contract.get("finalize_gates", {}).get("required_validation_commands")
-        or contract.get("validation_commands", [])
+        required_finalize_commands
+        if required_finalize_commands is not None
+        else contract.get("validation_commands", [])
     )
     if not isinstance(finalize_commands, list):
         finalize_commands = []
