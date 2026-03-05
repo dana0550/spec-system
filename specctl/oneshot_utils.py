@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,21 @@ BLOCKER_HEADER = (
 )
 BLOCKER_RULE = "|---|---|---|---|---|---|---|---|---|---|"
 PLACEHOLDER_RE = re.compile(rf"{re.escape(ONESHOT_PLACEHOLDER_PREFIX)}(B-E\d{{3}}-\d{{3}})")
+PLACEHOLDER_SCAN_EXCLUDED_DIRS = {
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tox",
+    ".nox",
+    "node_modules",
+    "build",
+    "dist",
+}
 
 
 def load_json_document(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -267,23 +283,34 @@ def write_memory_files(memory_dir: Path, state: dict[str, Any], open_blockers: l
 def scan_placeholder_markers(root: Path, exclude_prefixes: list[Path] | None = None) -> list[tuple[Path, int, str]]:
     excludes = [path.resolve() for path in (exclude_prefixes or [])]
     hits: list[tuple[Path, int, str]] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        current_dir = Path(dirpath)
+        resolved_dir = current_dir.resolve()
+        if any(resolved_dir.is_relative_to(prefix) for prefix in excludes):  # type: ignore[attr-defined]
+            dirnames[:] = []
             continue
-        if ".git" in path.parts:
-            continue
-        resolved = path.resolve()
-        if any(resolved.is_relative_to(prefix) for prefix in excludes):  # type: ignore[attr-defined]
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-        for idx, line in enumerate(text.splitlines(), start=1):
-            if ONESHOT_PLACEHOLDER_PREFIX in line:
-                match = PLACEHOLDER_RE.search(line)
-                marker = match.group(1) if match else ""
-                hits.append((path, idx, marker))
+
+        pruned_dirs: list[str] = []
+        for dirname in dirnames:
+            if dirname in PLACEHOLDER_SCAN_EXCLUDED_DIRS:
+                continue
+            child_dir = (current_dir / dirname).resolve()
+            if any(child_dir.is_relative_to(prefix) for prefix in excludes):  # type: ignore[attr-defined]
+                continue
+            pruned_dirs.append(dirname)
+        dirnames[:] = pruned_dirs
+
+        for filename in filenames:
+            path = current_dir / filename
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for idx, line in enumerate(text.splitlines(), start=1):
+                if ONESHOT_PLACEHOLDER_PREFIX in line:
+                    match = PLACEHOLDER_RE.search(line)
+                    marker = match.group(1) if match else ""
+                    hits.append((path, idx, marker))
     return hits
 
 
