@@ -8,7 +8,7 @@ from specctl.commands import render
 from specctl.epic_index import next_epic_id, read_epic_rows, write_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
 from specctl.io_utils import now_date, read_text, slugify, write_text
-from specctl.models import EpicRow, FeatureRow
+from specctl.models import EpicRow, FeatureRow, TraceabilityStats
 from specctl.oneshot_utils import (
     REQUIRED_BRIEF_SECTIONS,
     checkpoint_id,
@@ -19,6 +19,7 @@ from specctl.oneshot_utils import (
     parse_brief_sections,
 )
 from specctl.validators.ids import FEATURE_ID_RE
+from specctl.validators.traceability import validate_feature_traceability
 
 
 def run(args) -> int:
@@ -226,7 +227,8 @@ def run(args) -> int:
     write_text(epic_dir / "memory" / "decisions.md", "# Decisions\n\n- Epic scaffold generated.\n")
     write_text(epic_dir / "memory" / "open_threads.md", "# Open Threads\n\n- None\n")
 
-    render_rc = render.run(Namespace(root=str(root), check=False))
+    render_stats = _collect_traceability_stats(docs, working_rows)
+    render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
     if render_rc != 0:
         print("[ERROR] Failed to render project docs after epic creation.")
         return 1
@@ -234,3 +236,18 @@ def run(args) -> int:
     print(f"Created epic {epic_id} at {epic_dir}")
     print(f"Created {len(created_rows)} features in scope rooted at {root_row.feature_id}")
     return 0
+
+
+def _collect_traceability_stats(docs: Path, feature_rows: list[FeatureRow]) -> TraceabilityStats:
+    stats = TraceabilityStats()
+    for row in feature_rows:
+        feature_dir = (docs / row.spec_path).parent
+        if not feature_dir.exists():
+            continue
+        _, trace_stats = validate_feature_traceability(feature_dir)
+        stats.requirements_total += trace_stats.requirements_total
+        stats.requirements_with_design += trace_stats.requirements_with_design
+        stats.requirements_with_tasks += trace_stats.requirements_with_tasks
+        stats.scenarios_total += trace_stats.scenarios_total
+        stats.scenarios_with_evidence += trace_stats.scenarios_with_evidence
+    return stats

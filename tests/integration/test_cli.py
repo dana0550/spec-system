@@ -610,6 +610,40 @@ def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch
     )
 
 
+def test_epic_create_passes_precomputed_stats_to_render(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+
+    captured = {"has_stats": False}
+
+    def render_with_stats(args):
+        captured["has_stats"] = hasattr(args, "stats") and args.stats is not None
+        return 0
+
+    monkeypatch.setattr(epic_create_command.render, "run", render_with_stats)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "EpicStatsFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert captured["has_stats"] is True
+
+
 def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
