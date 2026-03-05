@@ -101,14 +101,11 @@ def validate_epics(root: Path, feature_rows: list[FeatureRow]) -> tuple[list[Lin
                     )
                 )
 
-        oneshot_msgs, contract = validate_oneshot_contract(root, row, feature_by_id)
+        oneshot_msgs, _ = validate_oneshot_contract(root, row, feature_by_id)
         messages.extend(oneshot_msgs)
 
         messages.extend(validate_run_artifacts(epic_dir))
         _aggregate_run_stats(epic_dir, stats)
-
-        if contract is None:
-            continue
 
     placeholder_hits = scan_placeholder_markers(root, exclude_prefixes=[docs / "epics"])
     stats.placeholder_leakage_count += len(placeholder_hits)

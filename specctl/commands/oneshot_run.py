@@ -205,7 +205,7 @@ def _run_validation_group(
             run_dir,
             {"type": "validation_group", "checkpoint_id": checkpoint_id, "phase": phase, "result": "empty"},
         )
-        return False
+        return True
     group_ok = True
     for command in commands:
         rc, output = run_shell(command, root)

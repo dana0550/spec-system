@@ -96,6 +96,31 @@ def empty_blocker_ledger() -> str:
     return "\n".join(["# Blockers Ledger", "", BLOCKER_HEADER, BLOCKER_RULE, ""]) + "\n"
 
 
+def _escape_cell(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("|", r"\|")
+
+
+def _split_row_cells(line: str) -> list[str]:
+    cells: list[str] = []
+    current: list[str] = []
+    idx = 0
+    while idx < len(line):
+        char = line[idx]
+        if char == "\\" and idx + 1 < len(line) and line[idx + 1] in {"\\", "|"}:
+            current.append(line[idx + 1])
+            idx += 2
+            continue
+        if char == "|":
+            cells.append("".join(current).strip())
+            current = []
+            idx += 1
+            continue
+        current.append(char)
+        idx += 1
+    cells.append("".join(current).strip())
+    return cells
+
+
 def parse_blockers(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
@@ -105,7 +130,7 @@ def parse_blockers(path: Path) -> list[dict[str, str]]:
             continue
         if line.strip() in {BLOCKER_HEADER, BLOCKER_RULE}:
             continue
-        cols = [part.strip() for part in line.strip().strip("|").split("|")]
+        cols = _split_row_cells(line.strip().strip("|"))
         if len(cols) != 10 or not cols[0].startswith("B-"):
             continue
         rows.append(
@@ -129,9 +154,10 @@ def append_blocker(path: Path, row: dict[str, str]) -> None:
     if not path.exists():
         write_text(path, empty_blocker_ledger())
     line = (
-        f"| {row['blocker_id']} | {row['checkpoint_id']} | {row['feature_id']} | {row['task_id']} | "
-        f"{row['severity']} | {row['type']} | {row['placeholder_marker']} | {row['owner']} | "
-        f"{row['exit_criteria']} | {row['status']} |"
+        f"| {_escape_cell(row['blocker_id'])} | {_escape_cell(row['checkpoint_id'])} | "
+        f"{_escape_cell(row['feature_id'])} | {_escape_cell(row['task_id'])} | {_escape_cell(row['severity'])} | "
+        f"{_escape_cell(row['type'])} | {_escape_cell(row['placeholder_marker'])} | {_escape_cell(row['owner'])} | "
+        f"{_escape_cell(row['exit_criteria'])} | {_escape_cell(row['status'])} |"
     )
     with path.open("a", encoding="utf-8") as handle:
         handle.write(line + "\n")
