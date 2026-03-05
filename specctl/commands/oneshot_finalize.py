@@ -113,6 +113,11 @@ def run(args) -> int:
                     )
                 )
 
+    if messages:
+        for message in messages:
+            print(format_message(message))
+        return 1
+
     rollback_contents: dict[Path, str | None] = {}
 
     def _snapshot(path: Path) -> None:

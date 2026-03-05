@@ -946,6 +946,48 @@ def test_oneshot_finalize_short_circuits_validation_when_blocked(tmp_path: Path,
     assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
 
 
+def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeGateFailureFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["true"]
+    payload.setdefault("finalize_gates", {})["required_validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | FinalizeGateFailureFlow | implementing |" in epics_text
+    scope_ids = set(payload["scope_feature_ids"])
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert all(row.status != "done" for row in rows if row.feature_id in scope_ids)
+
+
 def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
