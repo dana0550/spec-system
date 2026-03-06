@@ -194,6 +194,10 @@ def process_checkpoint(
 def finalize_run_status(state: dict[str, Any]) -> None:
     if state.get("status") == "blocked":
         return
+    checkpoint_status = state["checkpoint_status"].values()
+    if checkpoint_status and all(value == "pending" for value in checkpoint_status):
+        state["status"] = "running"
+        return
     if any(value == "blocked_with_placeholder" for value in state["checkpoint_status"].values()):
         state["status"] = "stabilizing"
     elif all(value == "passed" for value in state["checkpoint_status"].values()):

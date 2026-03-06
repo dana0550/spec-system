@@ -828,7 +828,10 @@ def test_oneshot_run_precreates_events_log_when_no_checkpoint_executes(tmp_path:
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
     run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     events_path = run_dir / "events.jsonl"
+    assert state["status"] == "running"
+    assert all(value == "pending" for value in state["checkpoint_status"].values())
     assert events_path.exists()
     assert events_path.read_text(encoding="utf-8") == ""
 
