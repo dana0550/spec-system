@@ -11,13 +11,24 @@ This repository distributes the `docs-spec-system` Codex Skill and Spec System v
 - First-class CLI for deterministic lint/render/check/approve/migrate/report
 - Migration command from v1 docs layout
 
-## Install Skill
+## Install Skill (Codex)
 
 ```bash
 install-skill-from-github.py --repo <owner>/<repo> --path skills/docs-spec-system
 ```
 
 Restart Codex after installation.
+
+## Install Skill (Claude Code)
+
+In Claude Code, run:
+
+```
+/plugin marketplace add dana0550/spec-system
+/plugin install docs-spec-system@spec-system-plugins
+```
+
+Then use `/docs-spec-system:spec-system` to invoke the skill.
 
 ## CLI Usage
 

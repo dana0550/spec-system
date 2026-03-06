@@ -1,0 +1,7 @@
+{
+  "name": "docs-spec-system",
+  "description": "Operate the Spec System v2 contract-first workflow with phase gates, EARS+RFC requirements, Gherkin scenarios, strict traceability, and first-class specctl enforcement.",
+  "version": "2.0.0",
+  "author": { "name": "dana0550" },
+  "repository": "https://github.com/dana0550/spec-system"
+}

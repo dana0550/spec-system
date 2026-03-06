@@ -1,0 +1,11 @@
+{
+  "name": "spec-system-plugins",
+  "owner": { "name": "dana0550" },
+  "plugins": [
+    {
+      "name": "docs-spec-system",
+      "source": "./skills/docs-spec-system",
+      "description": "Phase-gated spec system with strict traceability (specctl)"
+    }
+  ]
+}
