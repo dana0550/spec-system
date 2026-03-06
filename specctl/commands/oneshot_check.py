@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from specctl.command_utils import format_message
+from specctl.command_utils import format_message, project_root
 from specctl.commands.oneshot_common import load_epic_and_contract
 from specctl.feature_index import read_feature_rows
 from specctl.validators.oneshot import validate_oneshot_contract, validate_run_artifacts
 
 
 def run(args) -> int:
-    root = Path(args.root).resolve()
+    root = project_root(args.root)
     loaded, err = load_epic_and_contract(root, args.epic_id)
     if err:
         print(f"[ERROR] {err}")
