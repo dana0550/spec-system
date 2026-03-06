@@ -96,6 +96,14 @@ def extract_bullets(section_text: str) -> list[str]:
 
 
 def needs_ui_components(text: str) -> bool:
+    sections = parse_brief_sections(text)
+    if sections:
+        # Restrict UI inference to user-facing intent areas, not global constraints.
+        text = "\n".join(
+            sections.get(name, "")
+            for name in ("Vision", "Outcomes", "User Journeys")
+            if sections.get(name, "")
+        )
     lower = text.lower()
     for keyword in UI_KEYWORDS:
         if re.search(rf"\b{re.escape(keyword)}\b", lower):

@@ -113,3 +113,45 @@ def test_ui_detection_uses_word_boundaries() -> None:
     assert needs_ui_components("We build resilient backend orchestration.") is False
     assert needs_ui_components("Keep deployment workflow stable.") is True
     assert needs_ui_components("This includes a dashboard workflow.") is True
+
+
+def test_ui_detection_scopes_workflow_keyword_to_user_facing_sections() -> None:
+    brief_constraints_only = "\n".join(
+        [
+            "## Vision",
+            "- Improve reliability.",
+            "",
+            "## Outcomes",
+            "- Lower incident volume.",
+            "",
+            "## User Journeys",
+            "- Operator applies a policy.",
+            "",
+            "## Constraints",
+            "- Preserve deployment workflow integrity.",
+            "",
+            "## Non-Goals",
+            "- No UI redesign.",
+        ]
+    )
+    assert needs_ui_components(brief_constraints_only) is False
+
+    brief_user_journey = "\n".join(
+        [
+            "## Vision",
+            "- Improve reliability.",
+            "",
+            "## Outcomes",
+            "- Lower incident volume.",
+            "",
+            "## User Journeys",
+            "- User completes approval workflow in dashboard.",
+            "",
+            "## Constraints",
+            "- Preserve deployment pipeline.",
+            "",
+            "## Non-Goals",
+            "- None.",
+        ]
+    )
+    assert needs_ui_components(brief_user_journey) is True

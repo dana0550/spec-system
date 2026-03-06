@@ -140,7 +140,7 @@ Deterministic decomposition behavior:
   - `Domain/Data`
   - `Execution/Integration`
   - `Verification/Observability`
-- optional `UX/Client` is added when the brief includes UI keywords (`ui`, `frontend`, `screen`, `workflow`, `form`, `dashboard`)
+- optional `UX/Client` is added when user-facing brief sections (`Vision`, `Outcomes`, `User Journeys`) include UI keywords (`ui`, `frontend`, `screen`, `workflow`, `form`, `dashboard`)
 
 ### Execute and finalize one-shot
 ```bash
