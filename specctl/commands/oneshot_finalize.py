@@ -134,12 +134,18 @@ def run(args) -> int:
             rollback_contents[path] = None
 
     def _rollback() -> None:
+        failures: list[str] = []
         for path, original_text in rollback_contents.items():
-            if original_text is None:
-                if path.exists():
-                    path.unlink()
-            else:
-                write_text(path, original_text)
+            try:
+                if original_text is None:
+                    if path.exists():
+                        path.unlink()
+                else:
+                    write_text(path, original_text)
+            except Exception as exc:  # pragma: no cover - exercised via integration tests
+                failures.append(f"{path}: {exc}")
+        if failures:
+            raise RuntimeError("Rollback failed for one or more files: " + "; ".join(failures))
 
     scope_set = set(contract.get("scope_feature_ids", []))
     features_path = root / "docs" / "FEATURES.md"

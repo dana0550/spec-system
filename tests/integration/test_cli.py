@@ -1047,6 +1047,63 @@ def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: 
     assert epics_path.read_text(encoding="utf-8") == epics_before
 
 
+def test_oneshot_finalize_continues_rollback_when_one_restore_fails(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "PartialRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    product_map_path = root / "docs" / "PRODUCT_MAP.md"
+    traceability_path = root / "docs" / "TRACEABILITY.md"
+    traceability_before = traceability_path.read_text(encoding="utf-8")
+
+    def failing_render(args):
+        docs_dir = Path(args.root) / "docs"
+        (docs_dir / "PRODUCT_MAP.md").write_text("CORRUPTED PRODUCT MAP\n", encoding="utf-8")
+        (docs_dir / "TRACEABILITY.md").write_text("CORRUPTED TRACEABILITY\n", encoding="utf-8")
+        return 1
+
+    original_write_text = oneshot_finalize_command.write_text
+    injected_failure = {"hit": False}
+
+    def flaky_write_text(path: Path, text: str) -> None:
+        if Path(path) == product_map_path and not injected_failure["hit"]:
+            injected_failure["hit"] = True
+            raise OSError("simulated rollback restore failure")
+        original_write_text(path, text)
+
+    monkeypatch.setattr(oneshot_finalize_command.render, "run", failing_render)
+    monkeypatch.setattr(oneshot_finalize_command, "write_text", flaky_write_text)
+
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+    assert injected_failure["hit"] is True
+    # Even when one restore operation fails, rollback should continue restoring later files.
+    assert traceability_path.read_text(encoding="utf-8") == traceability_before
+
+
 def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
