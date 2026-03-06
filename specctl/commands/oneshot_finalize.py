@@ -8,7 +8,7 @@ from specctl.commands import render
 from specctl.commands.oneshot_common import load_epic_and_contract, read_run_state, run_shell, write_run_state
 from specctl.epic_index import read_epic_rows, write_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
-from specctl.io_utils import now_date, set_frontmatter_value, write_text
+from specctl.io_utils import now_date, now_timestamp, set_frontmatter_value, write_text
 from specctl.models import LintMessage
 from specctl.oneshot_utils import (
     collect_traceability_stats,
@@ -208,7 +208,7 @@ def run(args) -> int:
         else:
             state = {"checkpoint_status": {}}
         state["status"] = "completed"
-        state["completed_at"] = now_date()
+        state["completed_at"] = now_timestamp()
         write_run_state(run_dir, state)
         write_memory_files(memory_dir, state, [])
 
