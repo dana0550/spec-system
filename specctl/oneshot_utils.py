@@ -16,7 +16,7 @@ from specctl.validators.traceability import validate_feature_traceability
 
 
 REQUIRED_BRIEF_SECTIONS = ["Vision", "Outcomes", "User Journeys", "Constraints", "Non-Goals"]
-UI_KEYWORDS = {"ui", "frontend", "screen", "workflow", "form", "dashboard"}
+UI_KEYWORDS = {"ui", "frontend", "screen", "form", "dashboard"}
 HARD_STOP_TYPES = [
     "data_loss_risk",
     "security_vulnerability",
