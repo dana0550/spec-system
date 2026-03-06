@@ -301,6 +301,9 @@ specctl check
 
 Migration writes backups under `.specctl-backups/migrate-<timestamp>/` and a report at `docs/MIGRATION_REPORT.md`.
 
+Upgrade safety note:
+- Running `specctl migrate-v1-to-v2` on existing v2/v2.1 workspaces is non-destructive for feature artifacts and backfills missing base docs (for example `EPICS.md`).
+
 ## Release model
 ### CI
 `ci.yml` runs on PRs and pushes to `main` and validates fixture docs, generated workspace smoke, migration smoke, and tests.

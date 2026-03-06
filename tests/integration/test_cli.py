@@ -271,6 +271,45 @@ def test_migrate_ignores_lowercase_requirement_like_bullets(tmp_path: Path) -> N
     assert "any healthy response." not in requirements_text
 
 
+def test_migrate_existing_v2_fixture_is_non_destructive(tmp_path: Path) -> None:
+    fixture = Path("tests/fixtures/v2_docs")
+    root = copy_fixture(tmp_path, fixture)
+    feature_dir = root / "docs" / "features" / "F-001-login"
+    before = {
+        name: (feature_dir / name).read_text(encoding="utf-8")
+        for name in ("requirements.md", "design.md", "tasks.md", "verification.md")
+    }
+
+    assert main(["migrate-v1-to-v2", "--root", str(root)]) == 0
+
+    after = {
+        name: (feature_dir / name).read_text(encoding="utf-8")
+        for name in ("requirements.md", "design.md", "tasks.md", "verification.md")
+    }
+    assert after == before
+    report_text = (root / "docs" / "MIGRATION_REPORT.md").read_text(encoding="utf-8")
+    assert "Detected existing v2 feature layout; no feature artifacts were rewritten." in report_text
+
+
+def test_migrate_existing_v2_fixture_backfills_epics_index(tmp_path: Path) -> None:
+    fixture = Path("tests/fixtures/v2_docs")
+    root = copy_fixture(tmp_path, fixture)
+    (root / "docs" / "EPICS.md").unlink()
+    shutil.rmtree(root / "docs" / "epics", ignore_errors=True)
+    requirements_before = (root / "docs" / "features" / "F-001-login" / "requirements.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert main(["migrate-v1-to-v2", "--root", str(root)]) == 0
+
+    assert (root / "docs" / "EPICS.md").exists()
+    assert (root / "docs" / "epics").exists()
+    requirements_after = (root / "docs" / "features" / "F-001-login" / "requirements.md").read_text(
+        encoding="utf-8"
+    )
+    assert requirements_after == requirements_before
+
+
 def test_migrate_invalid_fixture_fails(tmp_path: Path) -> None:
     root = tmp_path / "badrepo"
     (root / "docs").mkdir(parents=True)

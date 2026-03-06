@@ -84,6 +84,30 @@ def _migrate_docs(docs: Path) -> str | None:
     if not v1_feature_rows:
         return "No features found in docs/FEATURES.md"
 
+    layout = _detect_feature_layout(docs, v1_feature_rows)
+    if layout == "mixed":
+        return (
+            "Detected mixed feature layout (v1 + v2 artifacts). "
+            "Resolve to a single layout before running migration."
+        )
+    if layout == "v2":
+        write_feature_rows(features_path, v1_feature_rows)
+        write_text(
+            docs / "MIGRATION_REPORT.md",
+            "\n".join(
+                [
+                    "# Migration Report",
+                    "",
+                    f"Date: {now_date()}",
+                    "",
+                    "- Detected existing v2 feature layout; no feature artifacts were rewritten.",
+                    "- Ensured v2.1 base docs and epic scaffolding artifacts exist.",
+                    "",
+                ]
+            ),
+        )
+        return None
+
     migrated_rows: list[FeatureRow] = []
     report_lines = ["# Migration Report", "", f"Date: {now_date()}", ""]
 
@@ -307,3 +331,20 @@ def _ensure_base_v2_docs(docs: Path) -> None:
 def _map_legacy_status(status: str) -> str:
     normalized = status.strip().lower()
     return LEGACY_STATUS_MAP.get(normalized, "requirements_draft")
+
+
+def _detect_feature_layout(docs: Path, rows: list[FeatureRow]) -> str:
+    v2_count = sum(1 for row in rows if _is_v2_feature_row(docs, row))
+    if v2_count == 0:
+        return "v1"
+    if v2_count == len(rows):
+        return "v2"
+    return "mixed"
+
+
+def _is_v2_feature_row(docs: Path, row: FeatureRow) -> bool:
+    req_path = docs / row.spec_path
+    if req_path.name != "requirements.md" or not req_path.exists():
+        return False
+    feature_dir = req_path.parent
+    return all((feature_dir / name).exists() for name in ("design.md", "tasks.md", "verification.md"))
