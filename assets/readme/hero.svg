@@ -1,0 +1,83 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Spec System v2.1 Header</title>
+  <desc id="desc">Gradient hero image showing spec workflow from brief to finalized evidence.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1F2A"/>
+      <stop offset="0.55" stop-color="#15384A"/>
+      <stop offset="1" stop-color="#1D4D54"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="220" y1="140" x2="1120" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45D6B0"/>
+      <stop offset="1" stop-color="#F0E6A7"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1060 120) rotate(90) scale(220 320)">
+      <stop stop-color="#7EF2D0" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#7EF2D0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(220 560) rotate(90) scale(280 360)">
+      <stop stop-color="#F5D58A" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#F5D58A" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1280" height="640" fill="url(#glowA)"/>
+  <rect x="0" y="0" width="1280" height="640" fill="url(#glowB)"/>
+
+  <g opacity="0.17">
+    <path d="M0 488C159 457 303 440 421 444C576 448 730 499 880 511C1012 522 1145 503 1280 470" stroke="#8ED9C5" stroke-width="2"/>
+    <path d="M0 530C145 502 278 491 398 496C552 503 708 555 856 570C1001 584 1139 568 1280 536" stroke="#8ED9C5" stroke-width="2"/>
+    <path d="M0 430C171 401 316 387 445 392C602 398 756 450 901 462C1035 473 1157 456 1280 427" stroke="#8ED9C5" stroke-width="2"/>
+  </g>
+
+  <g filter="url(#soft)" opacity="0.35">
+    <circle cx="1130" cy="96" r="62" fill="#8FF5D6"/>
+    <circle cx="190" cy="586" r="84" fill="#F5D58A"/>
+  </g>
+
+  <rect x="76" y="94" width="110" height="28" rx="14" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.24)"/>
+  <text x="131" y="113" text-anchor="middle" fill="#E7FFF8" font-size="14" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" letter-spacing="1.4">v2.1</text>
+
+  <text x="76" y="220" fill="#F4F8F7" font-size="68" font-weight="700" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">Spec System</text>
+  <text x="76" y="278" fill="#ACD6CC" font-size="28" font-weight="500" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">Contract-first delivery for long-horizon coding agents.</text>
+
+  <text x="76" y="340" fill="#DAEFEA" font-size="20" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">Feature -> Epic -> One-shot orchestration with checkpointed validation, blocker ledgers,</text>
+  <text x="76" y="372" fill="#DAEFEA" font-size="20" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">and compaction-safe memory artifacts for deterministic resume.</text>
+
+  <g>
+    <rect x="76" y="448" width="188" height="46" rx="23" fill="rgba(69,214,176,0.16)" stroke="#45D6B0"/>
+    <text x="170" y="477" text-anchor="middle" fill="#DFFDF5" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">EARS + RFC</text>
+
+    <rect x="280" y="448" width="218" height="46" rx="23" fill="rgba(240,230,167,0.14)" stroke="#F0E6A7"/>
+    <text x="389" y="477" text-anchor="middle" fill="#FCF8DE" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">R -> D -> T -> S -> Evidence</text>
+
+    <rect x="514" y="448" width="188" height="46" rx="23" fill="rgba(69,214,176,0.16)" stroke="#45D6B0"/>
+    <text x="608" y="477" text-anchor="middle" fill="#DFFDF5" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">Codex + Claude</text>
+  </g>
+
+  <g>
+    <path d="M736 214H1170" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="736" cy="214" r="8" fill="#45D6B0"/>
+    <text x="758" y="220" fill="#D6F6ED" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">brief.md</text>
+
+    <path d="M796 264H1170" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="796" cy="264" r="8" fill="#74E2C3"/>
+    <text x="818" y="270" fill="#D6F6ED" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">decomposition.yaml</text>
+
+    <path d="M856 314H1170" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="856" cy="314" r="8" fill="#A9E8C5"/>
+    <text x="878" y="320" fill="#E2F5DE" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">oneshot.yaml</text>
+
+    <path d="M916 364H1170" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="916" cy="364" r="8" fill="#D3E7B6"/>
+    <text x="938" y="370" fill="#F0F7DC" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">memory + runs</text>
+
+    <path d="M976 414H1170" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="976" cy="414" r="8" fill="#F0E6A7"/>
+    <text x="998" y="420" fill="#FFF7D3" font-size="16" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">finalize gates</text>
+  </g>
+</svg>
