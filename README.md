@@ -26,6 +26,20 @@
   <a href="#release-model">Release</a>
 </p>
 
+## Install skills
+### Codex
+```bash
+install-skill-from-github.py --repo dana0550/spec-system --path skills/docs-spec-system
+```
+
+### Claude Code plugin
+```text
+/plugin marketplace add dana0550/spec-system
+/plugin install docs-spec-system@spec-system-plugins
+```
+
+Then use `/docs-spec-system:spec-system` to invoke the skill in Claude Code.
+
 ## Why spec-system
 Most spec workflows fail on long horizon builds because planning, execution, and verification drift apart. `docs-spec-system` keeps them locked together with deterministic artifacts, strict traceability, and a first-class one-shot runtime for epics.
 
