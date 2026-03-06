@@ -1,6 +1,6 @@
-# Spec System Rules (v2.1)
+# Spec System Rules (v2.2)
 
-Release: `docs-spec-system` v2.1.0.
+Release: `docs-spec-system` v2.2.0.
 
 ## Canonical Model
 
@@ -18,6 +18,7 @@ Release: `docs-spec-system` v2.1.0.
   - `memory/`
   - `runs/`
 - `docs/PRODUCT_MAP.md` and `docs/TRACEABILITY.md` are generated artifacts.
+- `docs/.specctl/impact-baseline.json` stores deterministic impact fingerprints and review anchors.
 - `docs/MASTER_SPEC.md` and `docs/STEERING.md` define product and architecture constraints.
 
 ## Canonical Layout
@@ -30,6 +31,8 @@ docs/
   PRODUCT_MAP.md
   TRACEABILITY.md
   STEERING.md
+  .specctl/
+    impact-baseline.json
   DECISIONS/
     ADR_TEMPLATE.md
   epics/
@@ -120,6 +123,10 @@ Every feature must satisfy:
 Global contract:
 
 - `R -> D -> T -> S -> evidence`
+- Impact drift must be reviewed:
+  - `specctl impact scan` reports direct (`added|changed|removed`) and propagated (`upstream_changed`) suspects.
+  - `specctl impact refresh` updates baseline fingerprints.
+  - `specctl impact refresh --ack-upstream` records explicit acknowledgment for unchanged downstream text.
 
 Epic contract:
 
@@ -127,6 +134,7 @@ Epic contract:
 - Epic one-shot finalize requires:
   - zero open blockers
   - zero unresolved `ONESHOT-BLOCKER:*` markers
+  - zero open impact suspects in scoped features
   - successful finalize validation command group
   - full scoped `R -> D -> T -> S -> evidence` traceability
 
@@ -145,6 +153,8 @@ Required command surface:
 - `specctl init`
 - `specctl feature create`
 - `specctl feature check`
+- `specctl impact scan`
+- `specctl impact refresh`
 - `specctl epic create`
 - `specctl epic check`
 - `specctl oneshot run`
@@ -178,3 +188,4 @@ Required command surface:
 9. One-shot contracts have valid checkpoint DAGs mapped to `T-*`.
 10. Run blockers ledger schema is valid.
 11. Rendered artifacts are up-to-date.
+12. Impact baseline exists and gating suspects are resolved or acknowledged.

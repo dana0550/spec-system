@@ -59,6 +59,11 @@ jobs:
       - name: Check fixture docs
         run: python -m specctl.cli check --root tests/fixtures/v2_docs
 
+      - name: Impact scan fixture docs
+        run: |
+          python -m specctl.cli impact refresh --root tests/fixtures/v2_docs
+          python -m specctl.cli impact scan --root tests/fixtures/v2_docs
+
       - name: Run tests
         run: python -m pytest
 
@@ -72,4 +77,5 @@ jobs:
             ## Upgrade
             1. Run `specctl migrate-v1-to-v2`.
             2. Run `specctl check`.
-            3. Resolve all blocking `ERROR` entries before shipping.
+            3. Run `specctl impact refresh && specctl impact scan`.
+            4. Resolve all blocking `ERROR` entries before shipping.

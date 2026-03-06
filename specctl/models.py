@@ -55,3 +55,25 @@ class OneShotStats:
     blockers_opened: int = 0
     blockers_resolved: int = 0
     placeholder_leakage_count: int = 0
+    impact_suspects_open: int = 0
+    impact_features_tracked: int = 0
+
+
+@dataclass(frozen=True)
+class ImpactSuspect:
+    feature_id: str
+    entity_type: str
+    entity_id: str
+    reason: str
+    upstream_ids: tuple[str, ...]
+    path: str
+    line: Optional[int]
+
+
+@dataclass(frozen=True)
+class ImpactScanResult:
+    baseline_status: str
+    features_scanned: int
+    features_tracked: int
+    suspects: tuple[ImpactSuspect, ...]
+    baseline_error: Optional[str] = None

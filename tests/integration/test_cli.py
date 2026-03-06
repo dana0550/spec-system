@@ -55,6 +55,7 @@ def test_full_feature_lifecycle(tmp_path: Path) -> None:
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
     assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "requirements"]) == 0
     _assert_feature_status(root, "F-001", "requirements_approved")
 
@@ -124,6 +125,8 @@ def test_design_and_tasks_approvals_sync_frontmatter(tmp_path: Path) -> None:
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-002"]) == 0
     assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "design"]) == 0
     assert main(["approve", "--root", str(root), "--feature-id", "F-002", "--phase", "tasks"]) == 0
     _assert_feature_status(root, "F-001", "design_approved")
@@ -474,6 +477,118 @@ def test_report_json_includes_runs_total(tmp_path: Path, monkeypatch, capsys) ->
     payload = json.loads(capsys.readouterr().out)
     assert payload["epics_total"] == 2
     assert payload["runs_total"] == 7
+    assert payload["impact_suspects_open"] == 0
+    assert payload["impact_features_tracked"] == 0
+
+
+def test_impact_scan_json_schema_and_refresh_flow(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "ImpactFlow", "--owner", "owner@example.com"]) == 0
+    capsys.readouterr()
+
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["baseline_status"] == "ok"
+    assert payload["suspects_open"] > 0
+    assert payload["features_scanned"] == 1
+    assert {"feature_id", "entity_type", "entity_id", "reason", "upstream_ids", "path", "line"} <= set(
+        payload["suspects"][0]
+    )
+
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    capsys.readouterr()
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["suspects_open"] == 0
+
+
+def test_impact_refresh_requires_ack_for_upstream_changed(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "AckFlow", "--owner", "owner@example.com"]) == 0
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    capsys.readouterr()
+
+    _mutate_requirement_statement(root, "F-001", "success response", "success payload")
+
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    reasons = {entry["reason"] for entry in payload["suspects"]}
+    assert "changed" in reasons
+    assert "upstream_changed" in reasons
+
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 1
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001", "--ack-upstream"]) == 0
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001"]) == 0
+
+
+def test_approve_blocks_until_impact_refresh_ack(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "feature",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ImpactApproval",
+                "--status",
+                "requirements_draft",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    _mutate_requirement_statement(root, "F-001", "success response", "validated response")
+
+    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "requirements"]) == 1
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001", "--ack-upstream"]) == 0
+    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "requirements"]) == 0
+
+
+def test_oneshot_finalize_blocks_until_impact_refresh_ack(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ImpactFinalize",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["impact", "refresh", "--root", str(root)]) == 0
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_id = next((epic_dir / "runs").iterdir()).name
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    target_feature = min(scope_ids)
+    _mutate_requirement_statement(root, target_feature, "success response", "success artifact")
+
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+    assert main(["impact", "refresh", "--root", str(root), "--ack-upstream"]) == 0
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
 
 
 def test_done_status_with_evidence_passes_check(tmp_path: Path) -> None:
@@ -528,6 +643,13 @@ def test_bugfix_template_contains_regression_flow() -> None:
     ]
     for token in required_tokens:
         assert token in text
+
+
+def _mutate_requirement_statement(root: Path, feature_id: str, old: str, new: str) -> None:
+    feature_dir = next((root / "docs" / "features").glob(f"{feature_id}-*"))
+    requirements_path = feature_dir / "requirements.md"
+    text = requirements_path.read_text(encoding="utf-8")
+    requirements_path.write_text(text.replace(old, new), encoding="utf-8")
 
 
 def _assert_feature_status(root: Path, feature_id: str, expected_status: str) -> None:
@@ -899,6 +1021,7 @@ def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root)]) == 0
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
@@ -1059,6 +1182,7 @@ def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: 
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root)]) == 0
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
@@ -1113,6 +1237,7 @@ def test_oneshot_finalize_continues_rollback_when_one_restore_fails(tmp_path: Pa
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root)]) == 0
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
@@ -1170,6 +1295,7 @@ def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monke
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root)]) == 0
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
@@ -1268,6 +1394,7 @@ def test_oneshot_finalize_passes_precomputed_stats_to_render(tmp_path: Path, mon
         )
         == 0
     )
+    assert main(["impact", "refresh", "--root", str(root)]) == 0
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
@@ -1323,6 +1450,7 @@ def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path)
     payload["validation_commands"] = ["true"]
     oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
     assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    assert main(["impact", "refresh", "--root", str(root), "--ack-upstream"]) == 0
 
     blockers = parse_blockers(run_dir / "blockers.md")
     assert blockers

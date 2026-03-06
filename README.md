@@ -12,7 +12,7 @@
   <a href="https://github.com/dana0550/spec-system/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/dana0550/spec-system/ci.yml?branch=main&label=CI" alt="CI"></a>
   <a href="https://github.com/dana0550/spec-system/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/dana0550/spec-system/release.yml?label=Release" alt="Release"></a>
   <a href="https://github.com/dana0550/spec-system/releases"><img src="https://img.shields.io/github/v/release/dana0550/spec-system" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/specctl-v2.1.0-0E8A92" alt="specctl v2.1.0">
+  <img src="https://img.shields.io/badge/specctl-v2.2.0-0E8A92" alt="specctl v2.2.0">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
@@ -274,6 +274,9 @@ specctl init
 specctl feature create --name "..." --owner <owner>
 specctl feature check --feature-id F-###
 
+specctl impact scan [--feature-id F-###] [--json]
+specctl impact refresh [--feature-id F-###] [--ack-upstream]
+
 specctl epic create --name "..." --owner <owner> --brief ./brief.md
 specctl epic check --epic-id E-###
 
@@ -291,6 +294,12 @@ specctl migrate-v1-to-v2
 specctl report [--json]
 ```
 
+### Impact baseline workflow
+- `specctl impact scan` detects direct (`added|changed|removed`) and propagated (`upstream_changed`) suspects.
+- `specctl impact refresh` updates baseline fingerprints in `docs/.specctl/impact-baseline.json`.
+- Use `--ack-upstream` when downstream text is intentionally unchanged after upstream edits.
+- `approve` and `oneshot finalize` are blocked while impact suspects remain open.
+
 ## Generated artifact layout
 ```text
 docs/
@@ -300,6 +309,8 @@ docs/
   PRODUCT_MAP.md
   TRACEABILITY.md
   STEERING.md
+  .specctl/
+    impact-baseline.json
   DECISIONS/
     ADR_TEMPLATE.md
   features/
@@ -324,6 +335,8 @@ Standard quality gate:
 specctl lint
 specctl render --check
 specctl check
+specctl impact refresh
+specctl impact scan
 python -m pytest
 ```
 
@@ -351,6 +364,8 @@ Common blocking error codes you will see:
 | `ONESHOT_FINALIZE_BLOCKED` | Finalization gates failed (open blockers/placeholders/failed commands). |
 | `ONESHOT_TRACEABILITY_INCOMPLETE` | Scoped features failed traceability requirements. |
 | `ONESHOT_PLACEHOLDER_UNTRACKED` | Placeholder leakage exists outside allowed epic paths. |
+| `IMPACT_BASELINE_MISSING` | Impact baseline file is missing or invalid for the requested gate. |
+| `IMPACT_SUSPECT_OPEN` | Impact suspects remain open and block approval/finalization gates. |
 
 ## Migration from v1
 ```bash
@@ -388,8 +403,8 @@ Manual tag flow from `main`:
 git fetch origin
 git switch main
 git pull --ff-only
-git tag -a v2.1.0 -m "docs-spec-system v2.1.0"
-git push origin v2.1.0
+git tag -a v2.2.0 -m "docs-spec-system v2.2.0"
+git push origin v2.2.0
 ```
 
 Automation in this repo:

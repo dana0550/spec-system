@@ -4,6 +4,7 @@ from pathlib import Path
 
 from specctl.constants import REQUIRED_DOC_FILES
 from specctl.feature_index import read_feature_rows
+from specctl.impact import build_lint_messages, scan_impact
 from specctl.models import FeatureRow, LintMessage, OneShotStats, TraceabilityStats
 from specctl.validators.epics import validate_epics
 from specctl.validators.ids import validate_feature_ids
@@ -121,6 +122,11 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
                     path=feature_dir,
                 )
             )
+
+    impact_scan = scan_impact(root)
+    oneshot_stats.impact_suspects_open = len(impact_scan.suspects)
+    oneshot_stats.impact_features_tracked = impact_scan.features_tracked
+    messages.extend(build_lint_messages(root, impact_scan))
 
     return messages, stats, oneshot_stats
 

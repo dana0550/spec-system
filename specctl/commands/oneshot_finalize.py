@@ -8,6 +8,7 @@ from specctl.commands import render
 from specctl.commands.oneshot_common import load_epic_and_contract, read_run_state, run_shell, write_run_state
 from specctl.epic_index import read_epic_rows, write_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
+from specctl.impact import build_gate_messages
 from specctl.io_utils import now_date, now_timestamp, set_frontmatter_value, write_text
 from specctl.models import LintMessage
 from specctl.oneshot_utils import (
@@ -34,6 +35,13 @@ def run(args) -> int:
         return 1
 
     messages: list[LintMessage] = []
+    scope_feature_ids = {
+        feature_id
+        for feature_id in contract.get("scope_feature_ids", [])
+        if isinstance(feature_id, str) and feature_id
+    }
+    messages.extend(build_gate_messages(root, scope_feature_ids, command_name="oneshot finalize"))
+
     blockers = parse_blockers(run_dir / "blockers.md")
     open_blockers = [row for row in blockers if row["status"] == "open"]
     if open_blockers:

@@ -124,6 +124,20 @@ def run(args) -> int:
     )
 
     write_text(
+        docs / ".specctl" / "impact-baseline.json",
+        "\n".join(
+            [
+                "{",
+                '  "features": {},',
+                f'  "generated_at": "{now_date()}",',
+                '  "schema_version": "1"',
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    write_text(
         decisions / "ADR_TEMPLATE.md",
         "\n".join(
             [
@@ -141,5 +155,5 @@ def run(args) -> int:
         + "\n",
     )
 
-    print(f"Initialized Spec System v2.1 at {docs}")
+    print(f"Initialized Spec System v2.2 at {docs}")
     return 0

@@ -1,16 +1,18 @@
-# Release And PR Workflow (v2.1)
+# Release And PR Workflow (v2.2)
 
 ## Required Validation Before PR
 
 1. `specctl lint`
 2. `specctl render --check`
 3. `specctl check`
-4. Unit and integration tests
-5. For epic changes, `specctl epic check --epic-id <E-ID>` and `specctl oneshot check --epic-id <E-ID>`
+4. `specctl impact scan`
+5. Unit and integration tests
+6. For epic changes, `specctl epic check --epic-id <E-ID>` and `specctl oneshot check --epic-id <E-ID>`
 
 Blocking condition:
 
 - Any `ERROR` in lint/check output.
+- Any non-zero exit from `specctl impact scan`.
 
 ## PR Assembly
 
@@ -26,6 +28,7 @@ Blocking condition:
 
 - No placeholders in PR template.
 - `specctl check` passes.
+- `specctl impact scan` reports zero open suspects.
 - For epic runs, `specctl oneshot finalize` succeeded with zero open blockers.
 - Migration path documented for users.
 - README and agent prompt are aligned with v2 command interface.
@@ -39,7 +42,7 @@ Blocking condition:
 5. GitHub Action `release.yml` validates:
    - tag commit is on `main`
    - tag matches `pyproject.toml` version
-   - `specctl lint`, `specctl render --check`, `specctl check`, and tests pass
+   - `specctl lint`, `specctl render --check`, `specctl check`, `specctl impact scan`, and tests pass
 6. On pass, workflow publishes GitHub Release for the tag.
 
 Automation note:

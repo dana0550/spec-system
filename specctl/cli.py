@@ -10,6 +10,8 @@ from specctl.commands import (
     epic_create,
     feature_check,
     feature_create,
+    impact_refresh,
+    impact_scan,
     init,
     lint,
     migrate,
@@ -24,7 +26,7 @@ from specctl.commands import (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="specctl", description="Spec System v2.1 CLI")
+    parser = argparse.ArgumentParser(prog="specctl", description="Spec System v2.2 CLI")
     parser.add_argument("--version", action="version", version=f"specctl {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -49,6 +51,21 @@ def build_parser() -> argparse.ArgumentParser:
     feature_check_parser.add_argument("--root", default=".")
     feature_check_parser.add_argument("--feature-id", required=True)
     feature_check_parser.set_defaults(func=feature_check.run)
+
+    impact_parser = subparsers.add_parser("impact", help="Impact analysis operations")
+    impact_sub = impact_parser.add_subparsers(dest="impact_command", required=True)
+
+    impact_scan_parser = impact_sub.add_parser("scan", help="Scan for direct and propagated impact suspects")
+    impact_scan_parser.add_argument("--root", default=".")
+    impact_scan_parser.add_argument("--feature-id")
+    impact_scan_parser.add_argument("--json", action="store_true")
+    impact_scan_parser.set_defaults(func=impact_scan.run)
+
+    impact_refresh_parser = impact_sub.add_parser("refresh", help="Refresh impact baseline fingerprints")
+    impact_refresh_parser.add_argument("--root", default=".")
+    impact_refresh_parser.add_argument("--feature-id")
+    impact_refresh_parser.add_argument("--ack-upstream", action="store_true")
+    impact_refresh_parser.set_defaults(func=impact_refresh.run)
 
     epic_parser = subparsers.add_parser("epic", help="Epic operations")
     epic_sub = epic_parser.add_subparsers(dest="epic_command", required=True)

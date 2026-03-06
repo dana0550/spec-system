@@ -28,6 +28,8 @@ def run(args) -> int:
         "blockers_opened": oneshot_stats.blockers_opened,
         "blockers_resolved": oneshot_stats.blockers_resolved,
         "placeholder_leakage_count": oneshot_stats.placeholder_leakage_count,
+        "impact_suspects_open": oneshot_stats.impact_suspects_open,
+        "impact_features_tracked": oneshot_stats.impact_features_tracked,
     }
 
     if args.json:
