@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,7 @@ PLACEHOLDER_SCAN_EXCLUDED_DIRS = {
     "build",
     "dist",
 }
+PLACEHOLDER_PREFIX_BYTES = ONESHOT_PLACEHOLDER_PREFIX.encode("utf-8")
 
 
 def load_json_document(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -297,7 +299,15 @@ def write_memory_files(memory_dir: Path, state: dict[str, Any], open_blockers: l
 
 
 def scan_placeholder_markers(root: Path, exclude_prefixes: list[Path] | None = None) -> list[tuple[Path, int, str]]:
+    resolved_root = root.resolve()
     excludes = [path.resolve() for path in (exclude_prefixes or [])]
+
+    # Fast path: use git's indexed grep when available to avoid Python-level full tree scans.
+    if (resolved_root / ".git").exists():
+        git_hits = _scan_placeholder_markers_with_git(resolved_root, excludes)
+        if git_hits is not None:
+            return git_hits
+
     hits: list[tuple[Path, int, str]] = []
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         current_dir = Path(dirpath)
@@ -318,6 +328,8 @@ def scan_placeholder_markers(root: Path, exclude_prefixes: list[Path] | None = N
 
         for filename in filenames:
             path = current_dir / filename
+            if not _file_contains_prefix(path):
+                continue
             try:
                 text = path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
@@ -329,6 +341,75 @@ def scan_placeholder_markers(root: Path, exclude_prefixes: list[Path] | None = N
                         continue
                     hits.append((path, idx, match.group(1)))
     return hits
+
+
+def _scan_placeholder_markers_with_git(root: Path, excludes: list[Path]) -> list[tuple[Path, int, str]] | None:
+    command = [
+        "git",
+        "-C",
+        str(root),
+        "grep",
+        "-n",
+        "--full-name",
+        "--no-color",
+        "-I",
+        "--untracked",
+        ONESHOT_PLACEHOLDER_PREFIX,
+        "--",
+        ".",
+    ]
+    try:
+        proc = subprocess.run(command, capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+
+    if proc.returncode not in {0, 1}:
+        return None
+    if proc.returncode == 1:
+        return []
+
+    hits: list[tuple[Path, int, str]] = []
+    for line in proc.stdout.splitlines():
+        relpath, line_no, content = _parse_git_grep_line(line)
+        if relpath is None:
+            continue
+        path = (root / relpath).resolve()
+        if any(path.is_relative_to(prefix) for prefix in excludes):  # type: ignore[attr-defined]
+            continue
+        match = PLACEHOLDER_RE.search(content)
+        if not match:
+            continue
+        hits.append((path, line_no, match.group(1)))
+    return hits
+
+
+def _parse_git_grep_line(line: str) -> tuple[str | None, int, str]:
+    parts = line.split(":", 2)
+    if len(parts) != 3:
+        return None, 0, ""
+    relpath, line_str, content = parts
+    try:
+        line_no = int(line_str)
+    except ValueError:
+        return None, 0, ""
+    return relpath, line_no, content
+
+
+def _file_contains_prefix(path: Path) -> bool:
+    overlap = len(PLACEHOLDER_PREFIX_BYTES) - 1
+    prev = b""
+    try:
+        with path.open("rb") as handle:
+            while True:
+                chunk = handle.read(65536)
+                if not chunk:
+                    return False
+                window = prev + chunk
+                if PLACEHOLDER_PREFIX_BYTES in window:
+                    return True
+                prev = window[-overlap:] if overlap > 0 else b""
+    except OSError:
+        return False
 
 
 def parse_task_ids(text: str) -> list[str]:

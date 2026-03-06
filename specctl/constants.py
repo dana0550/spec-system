@@ -47,6 +47,7 @@ EARS_TRIGGERS = {"WHEN", "IF", "WHILE", "WHERE", "WHENEVER"}
 REQUIRED_DOC_FILES = {
     "MASTER_SPEC.md",
     "FEATURES.md",
+    "EPICS.md",
     "PRODUCT_MAP.md",
     "TRACEABILITY.md",
     "STEERING.md",

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from specctl.commands.oneshot_common import run_shell
-from specctl.commands.oneshot_runtime import is_repo_integrity_failure, run_validation_group
+from specctl.commands.oneshot_runtime import finalize_run_status, is_repo_integrity_failure, run_validation_group
 from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, parse_task_ids, scan_placeholder_markers
 from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
@@ -34,6 +34,12 @@ def test_validation_group_empty_commands_is_success(tmp_path: Path) -> None:
     success, failed = run_validation_group(run_dir, tmp_path, "C-E001-001", [])
     assert success is True
     assert failed == []
+
+
+def test_finalize_run_status_empty_checkpoint_map_is_stabilizing() -> None:
+    state = {"status": "running", "checkpoint_status": {}}
+    finalize_run_status(state)
+    assert state["status"] == "stabilizing"
 
 
 def test_repo_integrity_failure_checks_failed_commands_only() -> None:

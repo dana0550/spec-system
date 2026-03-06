@@ -257,6 +257,21 @@ def _ensure_base_v2_docs(docs: Path) -> None:
             ]
         )
         + "\n",
+        "EPICS.md": "\n".join(
+            [
+                "---",
+                "doc_type: epic_index",
+                "version: 2.1.0",
+                f"last_synced: {now_date()}",
+                "---",
+                "# Epics Index",
+                "",
+                "| ID | Name | Status | Root Feature ID | Epic Path | Owner | Aliases |",
+                "|----|------|--------|-----------------|-----------|-------|---------|",
+                "",
+            ]
+        )
+        + "\n",
         "PRODUCT_MAP.md": "\n".join(
             [
                 "---",
@@ -286,6 +301,7 @@ def _ensure_base_v2_docs(docs: Path) -> None:
         path = docs / name
         if not path.exists():
             write_text(path, content)
+    (docs / "epics").mkdir(parents=True, exist_ok=True)
 
 
 def _map_legacy_status(status: str) -> str:
