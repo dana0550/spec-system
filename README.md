@@ -43,6 +43,14 @@ Then use `/docs-spec-system:spec-system` to invoke the skill in Claude Code.
 ## Why spec-system
 Most spec workflows fail on long horizon builds because planning, execution, and verification drift apart. `docs-spec-system` keeps them locked together with deterministic artifacts, strict traceability, and a first-class one-shot runtime for epics.
 
+### What ships in this repo
+| Module | Purpose |
+|---|---|
+| `specctl` CLI | Contract checks, render/check gates, lifecycle approvals, migration, epic + one-shot orchestration. |
+| Codex skill bundle | `skills/docs-spec-system/` instructions, workflows, templates, and references for agent execution. |
+| Claude plugin assets | `.claude-plugin/` and skill plugin metadata for Claude Code integration. |
+| Test suite | Unit + integration coverage for command behavior, migration safety, and one-shot runtime semantics. |
+
 ### What you get
 | Capability | What it does |
 |---|---|
@@ -69,6 +77,13 @@ flowchart LR
   F --> H["specctl oneshot finalize"]
   H --> I["Scoped features done + epic done"]
 ```
+
+### Invariants enforced by the system
+- Requirements use EARS triggers and RFC modal language.
+- Acceptance scenarios use Gherkin form (`Given/When/Then`).
+- Traceability is complete (`R -> D -> T -> S -> evidence`).
+- Epic checkpoint graph is DAG-valid and checkpoint IDs map to known tasks.
+- Finalization is blocked when open blockers or unresolved placeholders exist.
 
 ## Quickstart
 ### Install
@@ -141,6 +156,38 @@ Deterministic decomposition behavior:
   - `Execution/Integration`
   - `Verification/Observability`
 - optional `UX/Client` is added when user-facing brief sections (`Vision`, `Outcomes`, `User Journeys`) include UI keywords (`ui`, `frontend`, `screen`, `workflow`, `form`, `dashboard`)
+
+Minimal `oneshot.yaml` contract shape:
+
+```yaml
+epic_id: E-001
+root_feature_id: F-001
+scope_feature_ids: [F-001, F-002]
+runner: codex
+checkpoint_graph:
+  - checkpoint_id: C-E001-001
+    feature_id: F-001
+    task_ids: [T-F001-001]
+    depends_on: []
+validation_commands:
+  - python -m specctl.cli lint --root .
+repair_policy:
+  max_retries_per_checkpoint: 2
+  commands: []
+blocker_policy:
+  hard_stop_types:
+    - data_loss_risk
+    - security_vulnerability
+    - destructive_migration_without_rollback
+    - compliance_privacy_breach
+    - broken_repository_integrity
+finalize_gates:
+  require_zero_open_blockers: true
+  require_zero_placeholder_markers: true
+  require_full_traceability: true
+  required_validation_commands:
+    - python -m specctl.cli lint --root .
+```
 
 ### Execute and finalize one-shot
 ```bash
@@ -293,6 +340,18 @@ specctl epic check --epic-id E-001
 specctl oneshot check --epic-id E-001
 ```
 
+Common blocking error codes you will see:
+
+| Code | Meaning |
+|---|---|
+| `ONESHOT_CONTRACT_MISSING` | Required epic one-shot artifacts or keys are missing. |
+| `ONESHOT_CHECKPOINT_UNMAPPED` | Checkpoint graph is missing task mapping or is empty. |
+| `EPIC_SCOPE_FEATURE_MISSING` | One-shot scope references unknown feature IDs. |
+| `ONESHOT_BLOCKER_LEDGER_INVALID` | Run artifacts or blocker ledger schema is invalid. |
+| `ONESHOT_FINALIZE_BLOCKED` | Finalization gates failed (open blockers/placeholders/failed commands). |
+| `ONESHOT_TRACEABILITY_INCOMPLETE` | Scoped features failed traceability requirements. |
+| `ONESHOT_PLACEHOLDER_UNTRACKED` | Placeholder leakage exists outside allowed epic paths. |
+
 ## Migration from v1
 ```bash
 specctl migrate-v1-to-v2
@@ -303,6 +362,14 @@ Migration writes backups under `.specctl-backups/migrate-<timestamp>/` and a rep
 
 Upgrade safety note:
 - Running `specctl migrate-v1-to-v2` on existing v2/v2.1 workspaces is non-destructive for feature artifacts and backfills missing base docs (for example `EPICS.md`).
+
+Upgrade matrix:
+
+| Starting state | Command | Result |
+|---|---|---|
+| v1 flat specs (`docs/features/F-xxx.md`) | `specctl migrate-v1-to-v2` | Converts to folderized v2 artifacts and generates migration report. |
+| Existing v2/v2.1 folderized specs | `specctl migrate-v1-to-v2` | Non-destructive pass: preserves feature artifacts, backfills missing base docs/scaffolding. |
+| Mixed v1 + v2 layout | `specctl migrate-v1-to-v2` | Fails safely with explicit error; requires manual normalization first. |
 
 ## Release model
 ### CI
