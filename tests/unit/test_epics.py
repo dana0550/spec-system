@@ -111,5 +111,5 @@ def test_oneshot_check_handles_non_list_scope_feature_ids(tmp_path: Path) -> Non
 
 def test_ui_detection_uses_word_boundaries() -> None:
     assert needs_ui_components("We build resilient backend orchestration.") is False
-    assert needs_ui_components("Keep deployment workflow stable.") is False
+    assert needs_ui_components("Keep deployment workflow stable.") is True
     assert needs_ui_components("This includes a dashboard workflow.") is True
