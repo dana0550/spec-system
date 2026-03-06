@@ -96,14 +96,26 @@ def test_project_lint_detects_missing_docs(tmp_path: Path) -> None:
     assert any(m.code == "DOCS_MISSING" for m in messages)
 
 
-def test_project_lint_flags_missing_epics_index_when_initialized(tmp_path: Path) -> None:
+def test_project_lint_allows_missing_epics_index_without_epics(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
     (root / "docs" / "EPICS.md").unlink()
 
     messages, _, _ = lint_project(root)
-    assert any(message.code == "DOC_MISSING" and "EPICS.md" in message.message for message in messages)
+    assert not any(message.code == "DOC_MISSING" and "EPICS.md" in message.message for message in messages)
+    assert not any(message.code == "EPIC_INDEX_MISSING" for message in messages)
+
+
+def test_project_lint_flags_missing_epics_index_when_epics_exist(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    (root / "docs" / "EPICS.md").unlink()
+    (root / "docs" / "epics" / "E-001-legacy-epic").mkdir(parents=True)
+
+    messages, _, _ = lint_project(root)
+    assert any(message.code == "EPIC_INDEX_MISSING" for message in messages)
 
 
 def test_project_lint_runs_epic_validation_when_features_dir_missing(tmp_path: Path) -> None:

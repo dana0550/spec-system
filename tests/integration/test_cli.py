@@ -12,6 +12,7 @@ from specctl.cli import main
 from specctl.commands import check as check_command
 from specctl.commands import epic_create as epic_create_command
 from specctl.commands import oneshot_finalize as oneshot_finalize_command
+from specctl.commands import oneshot_resume as oneshot_resume_command
 from specctl.commands import render as render_command
 from specctl.commands import report as report_command
 from specctl.feature_index import read_feature_rows
@@ -1528,3 +1529,58 @@ def test_oneshot_resume_retries_pending_checkpoints_after_late_dependency_pass(t
     resumed_state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert resumed_state["status"] == "ready_to_finalize"
     assert all(value == "passed" for value in resumed_state["checkpoint_status"].values())
+
+
+def test_oneshot_resume_stops_when_status_leaves_resumable_states(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeStatusGuardFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    upstream = payload["checkpoint_graph"][0]
+    downstream = payload["checkpoint_graph"][1]
+    payload["checkpoint_graph"] = [downstream, upstream]
+    payload["validation_commands"] = ["false"]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    calls = {"count": 0}
+
+    def status_mutating_process_checkpoint(**kwargs):
+        calls["count"] += 1
+        checkpoint_id = kwargs["checkpoint_id"]
+        state = kwargs["state"]
+        state["checkpoint_status"][checkpoint_id] = "passed"
+        state["last_checkpoint"] = checkpoint_id
+        state["status"] = "ready_to_finalize"
+        return kwargs["blocker_seq"], False
+
+    monkeypatch.setattr(oneshot_resume_command, "process_checkpoint", status_mutating_process_checkpoint)
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    assert calls["count"] == 1

@@ -67,7 +67,7 @@ def run(args) -> int:
     blocker_seq = len(parse_blockers(run_dir / "blockers.md"))
 
     attempted_checkpoints: set[str] = set()
-    while state.get("status") != "blocked":
+    while state.get("status") in {"running", "stabilizing"}:
         progressed = False
         for checkpoint in checkpoints:
             checkpoint_id = checkpoint.get("checkpoint_id", "")
