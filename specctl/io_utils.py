@@ -16,6 +16,31 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def escape_markdown_table_cell(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("|", r"\|")
+
+
+def split_markdown_table_row(line: str) -> list[str]:
+    cells: list[str] = []
+    current: list[str] = []
+    idx = 0
+    while idx < len(line):
+        char = line[idx]
+        if char == "\\" and idx + 1 < len(line) and line[idx + 1] in {"\\", "|"}:
+            current.append(line[idx + 1])
+            idx += 2
+            continue
+        if char == "|":
+            cells.append("".join(current).strip())
+            current = []
+            idx += 1
+            continue
+        current.append(char)
+        idx += 1
+    cells.append("".join(current).strip())
+    return cells
+
+
 def set_frontmatter_value(path: Path, key: str, value: str) -> None:
     text = read_text(path)
     data, body = parse_frontmatter(text)

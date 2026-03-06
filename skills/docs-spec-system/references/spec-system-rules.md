@@ -1,15 +1,22 @@
-# Spec System Rules (v2)
+# Spec System Rules (v2.1)
 
-Release: `docs-spec-system` v2.0.0.
+Release: `docs-spec-system` v2.1.0.
 
 ## Canonical Model
 
 - `docs/FEATURES.md` is the canonical feature registry.
+- `docs/EPICS.md` is the canonical epic registry.
 - Each feature uses a folderized artifact set:
   - `requirements.md`
   - `design.md`
   - `tasks.md`
   - `verification.md`
+- Each epic uses a folderized one-shot artifact set:
+  - `brief.md`
+  - `decomposition.yaml`
+  - `oneshot.yaml`
+  - `memory/`
+  - `runs/`
 - `docs/PRODUCT_MAP.md` and `docs/TRACEABILITY.md` are generated artifacts.
 - `docs/MASTER_SPEC.md` and `docs/STEERING.md` define product and architecture constraints.
 
@@ -19,11 +26,19 @@ Release: `docs-spec-system` v2.0.0.
 docs/
   MASTER_SPEC.md
   FEATURES.md
+  EPICS.md
   PRODUCT_MAP.md
   TRACEABILITY.md
   STEERING.md
   DECISIONS/
     ADR_TEMPLATE.md
+  epics/
+    E-001-<slug>/
+      brief.md
+      decomposition.yaml
+      oneshot.yaml
+      memory/
+      runs/
   features/
     F-001-<slug>/
       requirements.md
@@ -35,12 +50,26 @@ docs/
 ## ID Grammar
 
 - Feature ID: `F-###` or dotted descendants (`F-001.01`, `F-001.01.01`)
+- Epic ID: `E-###`
 - Requirement ID: `R-F###(.##)*-###`
 - Scenario ID: `S-F###(.##)*-###`
 - Design decision ID: `D-F###(.##)*-###`
 - Task ID: `T-F###(.##)*-###`
+- One-shot checkpoint ID: `C-E###-###`
+- One-shot blocker ID: `B-E###-###`
 
 IDs are immutable after assignment.
+
+## Epic Lifecycle States
+
+Allowed states:
+
+- `planning`
+- `implementing`
+- `verifying`
+- `done`
+- `blocked`
+- `deprecated`
 
 ## Feature Lifecycle States
 
@@ -92,10 +121,20 @@ Global contract:
 
 - `R -> D -> T -> S -> evidence`
 
+Epic contract:
+
+- `brief -> decomposition -> oneshot contract -> run checkpoints -> blocker ledger -> finalize evidence`
+- Epic one-shot finalize requires:
+  - zero open blockers
+  - zero unresolved `ONESHOT-BLOCKER:*` markers
+  - successful finalize validation command group
+  - full scoped `R -> D -> T -> S -> evidence` traceability
+
 ## Generated Artifacts
 
 - `docs/PRODUCT_MAP.md` is rendered from `FEATURES.md` hierarchy.
 - `docs/TRACEABILITY.md` is rendered from feature traceability metrics.
+- Epic one-shot reports are emitted via `specctl oneshot report`.
 
 Generated files must be deterministic for identical inputs.
 
@@ -105,6 +144,14 @@ Required command surface:
 
 - `specctl init`
 - `specctl feature create`
+- `specctl feature check`
+- `specctl epic create`
+- `specctl epic check`
+- `specctl oneshot run`
+- `specctl oneshot resume`
+- `specctl oneshot check`
+- `specctl oneshot finalize`
+- `specctl oneshot report`
 - `specctl lint`
 - `specctl render`
 - `specctl check`
@@ -122,9 +169,12 @@ Required command surface:
 
 1. Required root docs exist.
 2. `FEATURES.md` feature IDs are unique and valid.
-3. All feature statuses are valid lifecycle states.
-4. Each feature folder contains required phase artifacts.
-5. Requirements satisfy EARS + RFC modality.
-6. Scenario IDs exist and verification evidence is present.
-7. Full traceability chain is complete.
-8. Rendered artifacts are up-to-date.
+3. `EPICS.md` epic IDs are unique and valid.
+4. All feature and epic statuses are valid lifecycle states.
+5. Each feature and epic folder contains required artifacts.
+6. Requirements satisfy EARS + RFC modality.
+7. Scenario IDs exist and verification evidence is present.
+8. Full traceability chain is complete.
+9. One-shot contracts have valid checkpoint DAGs mapped to `T-*`.
+10. Run blockers ledger schema is valid.
+11. Rendered artifacts are up-to-date.

@@ -9,9 +9,10 @@ def run(args) -> int:
     root = Path(args.root).resolve()
     docs = root / "docs"
     features = docs / "features"
+    epics = docs / "epics"
     decisions = docs / "DECISIONS"
 
-    for directory in [docs, features, decisions]:
+    for directory in [docs, features, epics, decisions]:
         directory.mkdir(parents=True, exist_ok=True)
 
     write_text(
@@ -21,7 +22,7 @@ def run(args) -> int:
                 "---",
                 "doc_type: master_spec",
                 "product_name: TBD",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 "status: active",
                 "owners: []",
                 f"last_reviewed: {now_date()}",
@@ -40,7 +41,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: steering",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 f"last_reviewed: {now_date()}",
                 "---",
                 "# Steering",
@@ -59,13 +60,31 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_index",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 f"last_synced: {now_date()}",
                 "---",
                 "# Features Index",
                 "",
                 "| ID | Name | Status | Parent ID | Spec Path | Owner | Aliases |",
                 "|----|------|--------|-----------|-----------|-------|---------|",
+            ]
+        )
+        + "\n",
+    )
+
+    write_text(
+        docs / "EPICS.md",
+        "\n".join(
+            [
+                "---",
+                "doc_type: epic_index",
+                "version: 2.1.0",
+                f"last_synced: {now_date()}",
+                "---",
+                "# Epics Index",
+                "",
+                "| ID | Name | Status | Root Feature ID | Epic Path | Owner | Aliases |",
+                "|----|------|--------|-----------------|-----------|-------|---------|",
             ]
         )
         + "\n",
@@ -92,7 +111,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: traceability",
-                "version: 2.0.0",
+                "version: 2.1.0",
                 f"last_rendered: {now_date()}",
                 "---",
                 "# Traceability Report",
@@ -122,5 +141,5 @@ def run(args) -> int:
         + "\n",
     )
 
-    print(f"Initialized Spec System v2 at {docs}")
+    print(f"Initialized Spec System v2.1 at {docs}")
     return 0

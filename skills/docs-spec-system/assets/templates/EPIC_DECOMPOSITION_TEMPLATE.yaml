@@ -1,0 +1,27 @@
+{
+  "epic_id": "E-XXX",
+  "name": "<Epic Name>",
+  "root_feature_id": "F-XXX",
+  "source_mode": "user_journeys",
+  "scope_feature_ids": [
+    "F-XXX"
+  ],
+  "children": [
+    {
+      "feature_id": "F-XXX.01",
+      "name": "<Journey Feature>",
+      "components": [
+        {
+          "feature_id": "F-XXX.01.01",
+          "name": "<Journey Feature> - Contract/API"
+        }
+      ]
+    }
+  ],
+  "generated_components": [
+    "Contract/API",
+    "Domain/Data",
+    "Execution/Integration",
+    "Verification/Observability"
+  ]
+}

@@ -1,6 +1,6 @@
 ---
 doc_type: traceability
-version: 2.0.0
+version: 2.1.0
 last_rendered: 2026-03-02
 ---
 # Traceability Report

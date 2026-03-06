@@ -1,7 +1,7 @@
 ---
-name: Docs System PR (v2)
-about: Track spec-system v2 changes with mandatory traceability and phase evidence
-title: "docs: <concise change summary> [F-XXX,…]"
+name: Docs System PR (v2.1)
+about: Track spec-system v2.1 changes with traceability, epic one-shot, and phase evidence
+title: "docs: <concise change summary> [E/F-XXX,…]"
 ---
 
 ## Summary
@@ -16,6 +16,11 @@ title: "docs: <concise change summary> [F-XXX,…]"
 
 ## Feature Coverage
 | Feature ID | Name | Change Type | Paths | Notes |
+|---|---|---|---|---|
+| | | | | |
+
+## Epic Coverage (if applicable)
+| Epic ID | Name | Run ID | Paths | Notes |
 |---|---|---|---|---|
 | | | | | |
 
@@ -36,6 +41,9 @@ title: "docs: <concise change summary> [F-XXX,…]"
 - [ ] `specctl lint`
 - [ ] `specctl render --check`
 - [ ] `specctl check`
+- [ ] `specctl epic check --epic-id <E-ID>` (if epic changed)
+- [ ] `specctl oneshot check --epic-id <E-ID>` (if epic changed)
+- [ ] `specctl oneshot finalize --epic-id <E-ID> --run-id <RUN-ID>` (if epic run finalized)
 - [ ] Unit tests
 - [ ] Integration tests
 

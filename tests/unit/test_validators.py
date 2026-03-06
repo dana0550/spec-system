@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
+from specctl.cli import main
 from specctl.validators.project import lint_project
 from specctl.validators.requirements import validate_requirements_file
 
@@ -90,5 +92,57 @@ def test_ears_trigger_requires_word_boundary(tmp_path: Path) -> None:
 
 
 def test_project_lint_detects_missing_docs(tmp_path: Path) -> None:
-    messages, _ = lint_project(tmp_path)
+    messages, _, _ = lint_project(tmp_path)
     assert any(m.code == "DOCS_MISSING" for m in messages)
+
+
+def test_project_lint_allows_missing_epics_index_without_epics(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    (root / "docs" / "EPICS.md").unlink()
+
+    messages, _, _ = lint_project(root)
+    assert not any(message.code == "DOC_MISSING" and "EPICS.md" in message.message for message in messages)
+    assert not any(message.code == "EPIC_INDEX_MISSING" for message in messages)
+
+
+def test_project_lint_flags_missing_epics_index_when_epics_exist(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    (root / "docs" / "EPICS.md").unlink()
+    (root / "docs" / "epics" / "E-001-legacy-epic").mkdir(parents=True)
+
+    messages, _, _ = lint_project(root)
+    assert any(message.code == "EPIC_INDEX_MISSING" for message in messages)
+
+
+def test_project_lint_runs_epic_validation_when_features_dir_missing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    (root / "docs" / "EPICS.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "doc_type: epic_index",
+                "version: 2.1.0",
+                "last_synced: 2026-03-05",
+                "---",
+                "# Epics Index",
+                "",
+                "| ID | Name | Status | Root Feature ID | Epic Path | Owner | Aliases |",
+                "|----|------|--------|-----------------|-----------|-------|---------|",
+                "| E-001 | MissingRoot | implementing | F-999 | epics/E-001-missing-root | owner@example.com | [] |",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    shutil.rmtree(root / "docs" / "features")
+
+    messages, _, _ = lint_project(root)
+    codes = {message.code for message in messages}
+    assert "FEATURES_DIR_MISSING" in codes
+    assert "EPIC_ROOT_FEATURE_MISSING" in codes

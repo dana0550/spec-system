@@ -1,0 +1,44 @@
+{
+  "epic_id": "E-XXX",
+  "root_feature_id": "F-XXX",
+  "scope_feature_ids": [
+    "F-XXX"
+  ],
+  "runner": "codex",
+  "checkpoint_graph": [
+    {
+      "checkpoint_id": "C-EXXX-001",
+      "name": "Root Feature Delivery",
+      "feature_id": "F-XXX",
+      "task_ids": [
+        "T-FXXX-001"
+      ],
+      "depends_on": [],
+      "blocker_type": "implementation_gap"
+    }
+  ],
+  "validation_commands": [
+    "python -m specctl.cli lint --root ."
+  ],
+  "repair_policy": {
+    "max_retries_per_checkpoint": 2,
+    "commands": []
+  },
+  "blocker_policy": {
+    "hard_stop_types": [
+      "data_loss_risk",
+      "security_vulnerability",
+      "destructive_migration_without_rollback",
+      "compliance_privacy_breach",
+      "broken_repository_integrity"
+    ]
+  },
+  "finalize_gates": {
+    "require_zero_open_blockers": true,
+    "require_zero_placeholder_markers": true,
+    "require_full_traceability": true,
+    "required_validation_commands": [
+      "python -m specctl.cli lint --root ."
+    ]
+  }
+}

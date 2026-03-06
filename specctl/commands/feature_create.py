@@ -8,56 +8,56 @@ from specctl.io_utils import now_date, slugify, write_text
 from specctl.validators.ids import FEATURE_ID_RE
 
 
-def run(args) -> int:
-    root = Path(args.root).resolve()
-    docs = root / "docs"
-    features_index = docs / "FEATURES.md"
-    rows = read_feature_rows(features_index)
+def create_feature_entry(
+    rows: list[FeatureRow],
+    *,
+    name: str,
+    status: str,
+    owner: str,
+    parent_id: str = "",
+    feature_id: str | None = None,
+) -> FeatureRow:
     existing_ids = {row.feature_id for row in rows}
 
-    if args.parent_id and args.parent_id not in existing_ids:
-        print(f"[ERROR] Parent ID not found: {args.parent_id}")
-        return 1
+    if parent_id and parent_id not in existing_ids:
+        raise ValueError(f"Parent ID not found: {parent_id}")
 
-    feature_id = args.feature_id
+    next_feature_id = feature_id
     auto_generated = not feature_id
     if auto_generated:
-        feature_id = next_child_id(rows, args.parent_id) if args.parent_id else next_top_level_id(rows)
+        next_feature_id = next_child_id(rows, parent_id) if parent_id else next_top_level_id(rows)
 
-    if not FEATURE_ID_RE.match(feature_id):
+    if not FEATURE_ID_RE.match(next_feature_id):
         if auto_generated:
-            print("[ERROR] Cannot auto-generate feature ID: numbering space exhausted")
-        else:
-            print(f"[ERROR] Invalid feature ID format: {feature_id}")
-        return 1
-    if feature_id in existing_ids:
-        print(f"[ERROR] Feature ID already exists: {feature_id}")
-        return 1
+            raise ValueError("Cannot auto-generate feature ID: numbering space exhausted")
+        raise ValueError(f"Invalid feature ID format: {next_feature_id}")
+    if next_feature_id in existing_ids:
+        raise ValueError(f"Feature ID already exists: {next_feature_id}")
 
-    name = args.name.strip()
-    status = args.status
+    feature_name = name.strip()
     if status not in FEATURE_STATUSES:
-        print(f"[ERROR] Invalid lifecycle status '{status}'")
-        return 1
-    slug = f"{feature_id}-{slugify(name)}"
+        raise ValueError(f"Invalid lifecycle status '{status}'")
+    slug = f"{next_feature_id}-{slugify(feature_name)}"
     spec_path = f"features/{slug}/requirements.md"
 
-    row = FeatureRow(
-        feature_id=feature_id,
-        name=name,
+    return FeatureRow(
+        feature_id=next_feature_id,
+        name=feature_name,
         status=status,
-        parent_id=args.parent_id or "",
+        parent_id=parent_id,
         spec_path=spec_path,
-        owner=args.owner or "unassigned",
+        owner=owner or "unassigned",
         aliases="[]",
     )
-    rows.append(row)
-    rows.sort(key=lambda r: r.feature_id)
-    write_feature_rows(features_index, rows)
 
-    feature_dir = docs / "features" / slug
+
+def scaffold_feature_files(docs: Path, row: FeatureRow) -> Path:
+    feature_dir = docs / Path(row.spec_path).parent
     feature_dir.mkdir(parents=True, exist_ok=True)
     scenario_text = "Given valid input When the request is submitted Then the response status is 200."
+    feature_digits = row.feature_id.replace("-", "")
+    feature_name = row.name
+    status = row.status
 
     write_text(
         feature_dir / "requirements.md",
@@ -65,16 +65,16 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_requirements",
-                f"feature_id: {feature_id}",
-                f"name: {name}",
+                f"feature_id: {row.feature_id}",
+                f"name: {feature_name}",
                 f"status: {status}",
-                f"owner: {args.owner or 'unassigned'}",
+                f"owner: {row.owner}",
                 f"last_updated: {now_date()}",
                 "---",
-                f"# {name} Requirements",
+                f"# {feature_name} Requirements",
                 "",
-                f"- R-{feature_id.replace('-', '')}-001: WHEN a user submits valid input, the system MUST process the request and return a success response.",
-                f"- S-{feature_id.replace('-', '')}-001: {scenario_text}",
+                f"- R-{feature_digits}-001: WHEN a user submits valid input, the system MUST process the request and return a success response.",
+                f"- S-{feature_digits}-001: {scenario_text}",
             ]
         )
         + "\n",
@@ -86,13 +86,13 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_design",
-                f"feature_id: {feature_id}",
+                f"feature_id: {row.feature_id}",
                 f"status: {status}",
                 f"last_updated: {now_date()}",
                 "---",
-                f"# {name} Design",
+                f"# {feature_name} Design",
                 "",
-                f"- D-{feature_id.replace('-', '')}-001: Implements R-{feature_id.replace('-', '')}-001 using the existing service boundary.",
+                f"- D-{feature_digits}-001: Implements R-{feature_digits}-001 using the existing service boundary.",
             ]
         )
         + "\n",
@@ -104,13 +104,13 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_tasks",
-                f"feature_id: {feature_id}",
+                f"feature_id: {row.feature_id}",
                 f"status: {status}",
                 f"last_updated: {now_date()}",
                 "---",
-                f"# {name} Tasks",
+                f"# {feature_name} Tasks",
                 "",
-                f"- [ ] T-{feature_id.replace('-', '')}-001 Implement handler (R: R-{feature_id.replace('-', '')}-001, D: D-{feature_id.replace('-', '')}-001)",
+                f"- [ ] T-{feature_digits}-001 Implement handler (R: R-{feature_digits}-001, D: D-{feature_digits}-001)",
             ]
         )
         + "\n",
@@ -122,18 +122,44 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_verification",
-                f"feature_id: {feature_id}",
+                f"feature_id: {row.feature_id}",
                 f"status: {status}",
                 f"last_updated: {now_date()}",
                 "---",
-                f"# {name} Verification",
+                f"# {feature_name} Verification",
                 "",
-                f"- S-{feature_id.replace('-', '')}-001: {scenario_text}",
-                f"Evidence: S-{feature_id.replace('-', '')}-001 -> TBD",
+                f"- S-{feature_digits}-001: {scenario_text}",
+                f"Evidence: S-{feature_digits}-001 -> TBD",
             ]
         )
         + "\n",
     )
+    return feature_dir
 
-    print(f"Created feature {feature_id} at {feature_dir}")
+
+def run(args) -> int:
+    root = Path(args.root).resolve()
+    docs = root / "docs"
+    features_index = docs / "FEATURES.md"
+    rows = read_feature_rows(features_index)
+
+    try:
+        row = create_feature_entry(
+            rows,
+            name=args.name,
+            status=args.status,
+            owner=args.owner or "unassigned",
+            parent_id=args.parent_id or "",
+            feature_id=args.feature_id,
+        )
+    except ValueError as exc:
+        print(f"[ERROR] {exc}")
+        return 1
+
+    rows.append(row)
+    rows.sort(key=lambda r: r.feature_id)
+    write_feature_rows(features_index, rows)
+
+    feature_dir = scaffold_feature_files(docs, row)
+    print(f"Created feature {row.feature_id} at {feature_dir}")
     return 0

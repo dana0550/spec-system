@@ -17,7 +17,7 @@ def run(args) -> int:
     rows = read_feature_rows(features_index_path)
     stats: TraceabilityStats | None = getattr(args, "stats", None)
     if stats is None:
-        _, stats = lint_project(root)
+        _, stats, _ = lint_project(root)
     render_stamp = _deterministic_render_stamp(features_index_path)
 
     product_map = render_product_map(rows).replace("last_rendered: TBD", f"last_rendered: {render_stamp}")

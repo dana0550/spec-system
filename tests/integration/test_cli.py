@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+from collections import Counter
+import json
 import re
 import shutil
 from pathlib import Path
 
+import yaml
+
 from specctl.cli import main
 from specctl.commands import check as check_command
+from specctl.commands import epic_create as epic_create_command
+from specctl.commands import oneshot_finalize as oneshot_finalize_command
+from specctl.commands import oneshot_resume as oneshot_resume_command
 from specctl.commands import render as render_command
+from specctl.commands import report as report_command
 from specctl.feature_index import read_feature_rows
+from specctl.models import OneShotStats, TraceabilityStats
+from specctl.oneshot_utils import parse_blockers
 from specctl.validators.project import lint_project as real_lint_project
 
 
@@ -261,6 +271,45 @@ def test_migrate_ignores_lowercase_requirement_like_bullets(tmp_path: Path) -> N
     assert "any healthy response." not in requirements_text
 
 
+def test_migrate_existing_v2_fixture_is_non_destructive(tmp_path: Path) -> None:
+    fixture = Path("tests/fixtures/v2_docs")
+    root = copy_fixture(tmp_path, fixture)
+    feature_dir = root / "docs" / "features" / "F-001-login"
+    before = {
+        name: (feature_dir / name).read_text(encoding="utf-8")
+        for name in ("requirements.md", "design.md", "tasks.md", "verification.md")
+    }
+
+    assert main(["migrate-v1-to-v2", "--root", str(root)]) == 0
+
+    after = {
+        name: (feature_dir / name).read_text(encoding="utf-8")
+        for name in ("requirements.md", "design.md", "tasks.md", "verification.md")
+    }
+    assert after == before
+    report_text = (root / "docs" / "MIGRATION_REPORT.md").read_text(encoding="utf-8")
+    assert "Detected existing v2 feature layout; no feature artifacts were rewritten." in report_text
+
+
+def test_migrate_existing_v2_fixture_backfills_epics_index(tmp_path: Path) -> None:
+    fixture = Path("tests/fixtures/v2_docs")
+    root = copy_fixture(tmp_path, fixture)
+    (root / "docs" / "EPICS.md").unlink()
+    shutil.rmtree(root / "docs" / "epics", ignore_errors=True)
+    requirements_before = (root / "docs" / "features" / "F-001-login" / "requirements.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert main(["migrate-v1-to-v2", "--root", str(root)]) == 0
+
+    assert (root / "docs" / "EPICS.md").exists()
+    assert (root / "docs" / "epics").exists()
+    requirements_after = (root / "docs" / "features" / "F-001-login" / "requirements.md").read_text(
+        encoding="utf-8"
+    )
+    assert requirements_after == requirements_before
+
+
 def test_migrate_invalid_fixture_fails(tmp_path: Path) -> None:
     root = tmp_path / "badrepo"
     (root / "docs").mkdir(parents=True)
@@ -413,6 +462,20 @@ def test_check_reuses_lint_stats_for_render(tmp_path: Path, monkeypatch) -> None
     assert calls["render"] == 0
 
 
+def test_report_json_includes_runs_total(tmp_path: Path, monkeypatch, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+
+    def lint_stub(_root: Path):
+        return [], TraceabilityStats(), OneShotStats(epics_total=2, runs_total=7)
+
+    monkeypatch.setattr(report_command, "lint_project", lint_stub)
+    assert main(["report", "--root", str(root), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["epics_total"] == 2
+    assert payload["runs_total"] == 7
+
+
 def test_done_status_with_evidence_passes_check(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -479,3 +542,1084 @@ def _assert_feature_status(root: Path, feature_id: str, expected_status: str) ->
     for filename in ["requirements.md", "design.md", "tasks.md", "verification.md"]:
         text = (feature_dir / filename).read_text(encoding="utf-8")
         assert f"status: {expected_status}" in text
+
+
+def _write_epic_brief(path: Path, *, include_ui: bool = False) -> None:
+    vision = "- Deliver account orchestration and reporting."
+    if include_ui:
+        vision = "- Deliver account orchestration and reporting dashboard."
+    path.write_text(
+        "\n".join(
+            [
+                "# Example Epic",
+                "",
+                "## Vision",
+                vision,
+                "",
+                "## Outcomes",
+                "- Improve setup reliability",
+                "- Improve operational insight",
+                "",
+                "## User Journeys",
+                "- Admin provisions tenant",
+                "- Admin reviews onboarding status",
+                "",
+                "## Constraints",
+                "- Must preserve existing API compatibility",
+                "",
+                "## Non-Goals",
+                "- No billing changes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_feature_check_command_passes_for_scaffolded_feature(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "FeatureCheck", "--owner", "owner@example.com"]) == 0
+    assert main(["feature", "check", "--root", str(root), "--feature-id", "F-001"]) == 0
+
+
+def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "Account Onboarding",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | Account Onboarding | implementing | F-001 |" in epics_text
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert len(rows) == 13
+    assert rows[0].feature_id == "F-001"
+    assert any(row.feature_id == "F-001.01.05" for row in rows)
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot["epic_id"] == "E-001"
+    assert len(oneshot["scope_feature_ids"]) == 13
+    assert len(oneshot["checkpoint_graph"]) == 13
+    assert oneshot["checkpoint_graph"][0]["depends_on"] == []
+    assert oneshot["checkpoint_graph"][1]["depends_on"] == [oneshot["checkpoint_graph"][0]["checkpoint_id"]]
+
+
+def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+
+    monkeypatch.setattr(epic_create_command.render, "run", lambda _args: 1)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "RenderFailure",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 1
+    )
+
+
+def test_epic_create_passes_precomputed_stats_to_render(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+
+    captured = {"has_stats": False}
+
+    def render_with_stats(args):
+        captured["has_stats"] = hasattr(args, "stats") and args.stats is not None
+        return 0
+
+    monkeypatch.setattr(epic_create_command.render, "run", render_with_stats)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "EpicStatsFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert captured["has_stats"] is True
+
+
+def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MissingValidationCommands",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = []
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    assert main(["oneshot", "check", "--root", str(root), "--epic-id", "E-001"]) == 1
+
+
+def test_oneshot_run_uses_soft_blocker_for_non_integrity_failure(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "SoftBlockerFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["repair_policy"]["max_retries_per_checkpoint"] = 0
+    payload["checkpoint_graph"][0]["validation_commands"] = [
+        "python -c \"import sys; sys.exit(0)\"",
+        "python -c \"import sys; sys.exit(1)\"",
+    ]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    first_checkpoint = payload["checkpoint_graph"][0]["checkpoint_id"]
+    assert state["status"] == "stabilizing"
+    assert state["checkpoint_status"][first_checkpoint] == "blocked_with_placeholder"
+
+
+def test_oneshot_run_handles_missing_validation_binary_without_crashing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MissingBinaryRunFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    command = "definitely-not-a-real-binary-oneshot-command"
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["repair_policy"]["max_retries_per_checkpoint"] = 0
+    payload["validation_commands"] = [command]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = [command]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    first_checkpoint = payload["checkpoint_graph"][0]["checkpoint_id"]
+    assert state["status"] == "stabilizing"
+    assert state["checkpoint_status"][first_checkpoint] == "blocked_with_placeholder"
+    assert "Unable to execute command" in (run_dir / "events.jsonl").read_text(encoding="utf-8")
+
+
+def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "EmptyValidationFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = []
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = []
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    blockers = (run_dir / "blockers.md").read_text(encoding="utf-8")
+    assert state["status"] == "ready_to_finalize"
+    assert "B-E001-" not in blockers
+
+
+def test_oneshot_run_precreates_events_log_when_no_checkpoint_executes(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "NoProgressFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["checkpoint_graph"][0]["depends_on"] = ["C-E001-999"]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    events_path = run_dir / "events.jsonl"
+    assert state["status"] == "running"
+    assert all(value == "pending" for value in state["checkpoint_status"].values())
+    assert events_path.exists()
+    assert events_path.read_text(encoding="utf-8") == ""
+
+
+def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | FinalizeFlow | done |" in epics_text
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    for row in rows:
+        if row.feature_id in scope_ids:
+            assert row.status == "done"
+
+
+def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "BlockerFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    blockers = (run_dir / "blockers.md").read_text(encoding="utf-8")
+    assert "B-E001-001" in blockers
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+
+def test_oneshot_finalize_short_circuits_validation_when_blocked(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeShortCircuitFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_id = next((epic_dir / "runs").iterdir()).name
+
+    def should_not_run_shell(_command: str, _cwd: Path) -> tuple[int, str]:
+        raise AssertionError("run_shell should not execute after finalize pre-checks already failed")
+
+    monkeypatch.setattr(oneshot_finalize_command, "run_shell", should_not_run_shell)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+
+def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeGateFailureFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["true"]
+    payload.setdefault("finalize_gates", {})["required_validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    def should_not_validate(_feature_dir: Path):
+        raise AssertionError("traceability checks should not run after finalize validation command failure")
+
+    monkeypatch.setattr(oneshot_finalize_command, "validate_feature_traceability", should_not_validate)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | FinalizeGateFailureFlow | implementing |" in epics_text
+    scope_ids = set(payload["scope_feature_ids"])
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert all(row.status != "done" for row in rows if row.feature_id in scope_ids)
+
+
+def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "RenderRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    product_map_path = root / "docs" / "PRODUCT_MAP.md"
+    traceability_path = root / "docs" / "TRACEABILITY.md"
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+
+    product_map_before = product_map_path.read_text(encoding="utf-8")
+    traceability_before = traceability_path.read_text(encoding="utf-8")
+    features_before = features_path.read_text(encoding="utf-8")
+    epics_before = epics_path.read_text(encoding="utf-8")
+
+    def failing_render(args):
+        docs_dir = Path(args.root) / "docs"
+        (docs_dir / "PRODUCT_MAP.md").write_text("CORRUPTED PRODUCT MAP\n", encoding="utf-8")
+        (docs_dir / "TRACEABILITY.md").write_text("CORRUPTED TRACEABILITY\n", encoding="utf-8")
+        return 1
+
+    monkeypatch.setattr(oneshot_finalize_command.render, "run", failing_render)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    assert product_map_path.read_text(encoding="utf-8") == product_map_before
+    assert traceability_path.read_text(encoding="utf-8") == traceability_before
+    assert features_path.read_text(encoding="utf-8") == features_before
+    assert epics_path.read_text(encoding="utf-8") == epics_before
+
+
+def test_oneshot_finalize_continues_rollback_when_one_restore_fails(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "PartialRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    product_map_path = root / "docs" / "PRODUCT_MAP.md"
+    traceability_path = root / "docs" / "TRACEABILITY.md"
+    traceability_before = traceability_path.read_text(encoding="utf-8")
+
+    def failing_render(args):
+        docs_dir = Path(args.root) / "docs"
+        (docs_dir / "PRODUCT_MAP.md").write_text("CORRUPTED PRODUCT MAP\n", encoding="utf-8")
+        (docs_dir / "TRACEABILITY.md").write_text("CORRUPTED TRACEABILITY\n", encoding="utf-8")
+        return 1
+
+    original_write_text = oneshot_finalize_command.write_text
+    injected_failure = {"hit": False}
+
+    def flaky_write_text(path: Path, text: str) -> None:
+        if Path(path) == product_map_path and not injected_failure["hit"]:
+            injected_failure["hit"] = True
+            raise OSError("simulated rollback restore failure")
+        original_write_text(path, text)
+
+    monkeypatch.setattr(oneshot_finalize_command.render, "run", failing_render)
+    monkeypatch.setattr(oneshot_finalize_command, "write_text", flaky_write_text)
+
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+    assert injected_failure["hit"] is True
+    # Even when one restore operation fails, rollback should continue restoring later files.
+    assert traceability_path.read_text(encoding="utf-8") == traceability_before
+
+
+def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "WriteRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+    features_before = features_path.read_text(encoding="utf-8")
+    epics_before = epics_path.read_text(encoding="utf-8")
+
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    scope_row = next(row for row in read_feature_rows(features_path) if row.feature_id in scope_ids)
+    requirements_path = (root / "docs" / scope_row.spec_path).parent / "requirements.md"
+    requirements_before = requirements_path.read_text(encoding="utf-8")
+
+    def failing_write_epics(path: Path, rows, version: str) -> None:
+        path.write_text("CORRUPTED EPICS\n", encoding="utf-8")
+        raise RuntimeError("forced epics write failure")
+
+    monkeypatch.setattr(oneshot_finalize_command, "write_epic_rows", failing_write_epics)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    assert features_path.read_text(encoding="utf-8") == features_before
+    assert epics_path.read_text(encoding="utf-8") == epics_before
+    assert requirements_path.read_text(encoding="utf-8") == requirements_before
+
+
+def test_oneshot_finalize_rolls_back_when_run_state_is_invalid(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "StateRollbackFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    features_path = root / "docs" / "FEATURES.md"
+    epics_path = root / "docs" / "EPICS.md"
+    features_before = features_path.read_text(encoding="utf-8")
+    epics_before = epics_path.read_text(encoding="utf-8")
+
+    scope_ids = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))["scope_feature_ids"]
+    scope_row = next(row for row in read_feature_rows(features_path) if row.feature_id in scope_ids)
+    requirements_path = (root / "docs" / scope_row.spec_path).parent / "requirements.md"
+    requirements_before = requirements_path.read_text(encoding="utf-8")
+
+    (run_dir / "state.json").write_text("{invalid-json", encoding="utf-8")
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    assert features_path.read_text(encoding="utf-8") == features_before
+    assert epics_path.read_text(encoding="utf-8") == epics_before
+    assert requirements_path.read_text(encoding="utf-8") == requirements_before
+
+
+def test_oneshot_finalize_passes_precomputed_stats_to_render(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "FinalizeStatsFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    captured = {"has_stats": False}
+
+    def render_with_stats(args):
+        captured["has_stats"] = hasattr(args, "stats") and args.stats is not None
+        return 0
+
+    monkeypatch.setattr(oneshot_finalize_command.render, "run", render_with_stats)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    assert captured["has_stats"] is True
+
+
+def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeResolveBlockerFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 1
+
+    payload["validation_commands"] = ["true"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+    blockers = parse_blockers(run_dir / "blockers.md")
+    assert blockers
+    assert all(row["status"] != "open" for row in blockers)
+    assert main(["oneshot", "finalize", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+
+def test_oneshot_resume_does_not_duplicate_open_blockers_for_retried_checkpoint(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeNoDuplicateBlockersFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    blockers_before = parse_blockers(run_dir / "blockers.md")
+    open_by_checkpoint_before = Counter(
+        row["checkpoint_id"] for row in blockers_before if row["status"] == "open"
+    )
+    assert open_by_checkpoint_before
+
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    blockers_after = parse_blockers(run_dir / "blockers.md")
+    open_by_checkpoint_after = Counter(row["checkpoint_id"] for row in blockers_after if row["status"] == "open")
+    assert open_by_checkpoint_after == open_by_checkpoint_before
+
+
+def test_oneshot_resume_processes_in_progress_checkpoint(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeInProgressFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["true"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    checkpoint_ids = [entry["checkpoint_id"] for entry in payload["checkpoint_graph"]]
+    state_path = run_dir / "state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["status"] = "running"
+    state["checkpoint_status"] = {
+        checkpoint_id: ("in_progress" if index == 0 else "pending")
+        for index, checkpoint_id in enumerate(checkpoint_ids)
+    }
+    state["last_checkpoint"] = checkpoint_ids[0]
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+
+    resumed_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert resumed_state["status"] == "ready_to_finalize"
+    assert all(value == "passed" for value in resumed_state["checkpoint_status"].values())
+
+
+def test_oneshot_resume_handles_missing_validation_binary_without_crashing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MissingBinaryResumeFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    command = "definitely-not-a-real-binary-oneshot-command"
+    payload["validation_commands"] = [command]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = [command]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    resumed_state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert resumed_state["status"] == "stabilizing"
+    events_text = (run_dir / "events.jsonl").read_text(encoding="utf-8")
+    assert '"phase": "resume"' in events_text
+    assert "Unable to execute command" in events_text
+
+
+def test_oneshot_run_retries_pending_checkpoints_after_late_dependency_pass(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "OutOfOrderRunFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    upstream = payload["checkpoint_graph"][0]
+    downstream = payload["checkpoint_graph"][1]
+    payload["checkpoint_graph"] = [downstream, upstream]
+    payload["validation_commands"] = ["true"]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = ["true"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert state["status"] == "ready_to_finalize"
+    assert all(value == "passed" for value in state["checkpoint_status"].values())
+
+
+def test_oneshot_resume_retries_pending_checkpoints_after_late_dependency_pass(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "OutOfOrderResumeFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    upstream = payload["checkpoint_graph"][0]
+    downstream = payload["checkpoint_graph"][1]
+    payload["checkpoint_graph"] = [downstream, upstream]
+    payload["validation_commands"] = ["false"]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+    initial_state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert initial_state["status"] == "stabilizing"
+
+    payload["validation_commands"] = ["true"]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = ["true"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    resumed_state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert resumed_state["status"] == "ready_to_finalize"
+    assert all(value == "passed" for value in resumed_state["checkpoint_status"].values())
+
+
+def test_oneshot_resume_stops_when_status_leaves_resumable_states(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ResumeStatusGuardFlow",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    upstream = payload["checkpoint_graph"][0]
+    downstream = payload["checkpoint_graph"][1]
+    payload["checkpoint_graph"] = [downstream, upstream]
+    payload["validation_commands"] = ["false"]
+    for checkpoint in payload["checkpoint_graph"]:
+        checkpoint["validation_commands"] = ["false"]
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    run_dir = next((epic_dir / "runs").iterdir())
+    run_id = run_dir.name
+
+    calls = {"count": 0}
+
+    def status_mutating_process_checkpoint(**kwargs):
+        calls["count"] += 1
+        checkpoint_id = kwargs["checkpoint_id"]
+        state = kwargs["state"]
+        state["checkpoint_status"][checkpoint_id] = "passed"
+        state["last_checkpoint"] = checkpoint_id
+        state["status"] = "ready_to_finalize"
+        return kwargs["blocker_seq"], False
+
+    monkeypatch.setattr(oneshot_resume_command, "process_checkpoint", status_mutating_process_checkpoint)
+    assert main(["oneshot", "resume", "--root", str(root), "--epic-id", "E-001", "--run-id", run_id]) == 0
+    assert calls["count"] == 1

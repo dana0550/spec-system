@@ -1,4 +1,4 @@
-# Release And PR Workflow (v2)
+# Release And PR Workflow (v2.1)
 
 ## Required Validation Before PR
 
@@ -6,6 +6,7 @@
 2. `specctl render --check`
 3. `specctl check`
 4. Unit and integration tests
+5. For epic changes, `specctl epic check --epic-id <E-ID>` and `specctl oneshot check --epic-id <E-ID>`
 
 Blocking condition:
 
@@ -14,16 +15,18 @@ Blocking condition:
 ## PR Assembly
 
 1. Use `assets/docs-system-pr-template.md`.
-2. Include all impacted IDs (`F`, `R`, `D`, `T`, `S`).
+2. Include all impacted IDs (`E`, `F`, `R`, `D`, `T`, `S`).
 3. Include phase approvals performed.
 4. Include migration notes (if `migrate-v1-to-v2` was used).
 5. Include traceability and verification evidence links.
 6. Include exact command outputs used for validation.
+7. For one-shot runs, include run ID, checkpoint summary, and blocker closure proof.
 
 ## Release Gates
 
 - No placeholders in PR template.
 - `specctl check` passes.
+- For epic runs, `specctl oneshot finalize` succeeded with zero open blockers.
 - Migration path documented for users.
 - README and agent prompt are aligned with v2 command interface.
 
