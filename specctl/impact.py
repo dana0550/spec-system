@@ -422,11 +422,11 @@ def _build_current_graph(root: Path, rows: list[FeatureRow]) -> dict[str, dict[s
     graph: dict[str, dict[str, dict[str, Any]]] = {}
     for row in rows:
         feature_dir = (docs / row.spec_path).parent
-        graph[row.feature_id] = _extract_feature_nodes(root, row.feature_id, feature_dir)
+        graph[row.feature_id] = _extract_feature_nodes(root, feature_dir)
     return graph
 
 
-def _extract_feature_nodes(root: Path, feature_id: str, feature_dir: Path) -> dict[str, dict[str, Any]]:
+def _extract_feature_nodes(root: Path, feature_dir: Path) -> dict[str, dict[str, Any]]:
     nodes: dict[str, dict[str, Any]] = {}
     scenario_values: dict[str, list[str]] = {}
     scenario_meta: dict[str, tuple[str, int]] = {}

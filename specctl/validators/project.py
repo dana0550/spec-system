@@ -12,13 +12,8 @@ from specctl.validators.lifecycle import validate_statuses
 from specctl.validators.requirements import validate_requirements_file
 from specctl.validators.traceability import validate_feature_traceability
 
-_last_impact_scan: ImpactScanResult | None = None
-
-
 def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneShotStats]:
-    global _last_impact_scan
-    messages, stats, oneshot_stats, impact_scan = lint_project_with_impact(root)
-    _last_impact_scan = impact_scan
+    messages, stats, oneshot_stats, _ = lint_project_with_impact(root)
     return messages, stats, oneshot_stats
 
 
@@ -138,10 +133,6 @@ def lint_project_with_impact(
     messages.extend(build_lint_messages(root, impact_scan))
 
     return messages, stats, oneshot_stats, impact_scan
-
-
-def get_last_impact_scan() -> ImpactScanResult | None:
-    return _last_impact_scan
 
 
 def validate_feature_hierarchy(rows: list[FeatureRow], features_index_path: Path) -> list[LintMessage]:
