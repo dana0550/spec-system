@@ -182,14 +182,17 @@ def build_gate_messages(root: Path, feature_ids: set[str], command_name: str) ->
     scan = scan_impact(root, feature_ids=feature_ids)
     baseline_path = impact_baseline_path(root)
     if scan.baseline_status != "ok":
+        remediation = "Run `specctl impact refresh --root .`."
+        baseline_error = scan.baseline_error or "Impact baseline missing or invalid."
+        if remediation in baseline_error:
+            message = f"{command_name} blocked: {baseline_error}"
+        else:
+            message = f"{command_name} blocked: {baseline_error} {remediation}"
         return [
             LintMessage(
                 severity="ERROR",
                 code="IMPACT_BASELINE_MISSING",
-                message=(
-                    f"{command_name} blocked: {scan.baseline_error} "
-                    "Run `specctl impact refresh --root .`."
-                ),
+                message=message,
                 path=baseline_path,
             )
         ]

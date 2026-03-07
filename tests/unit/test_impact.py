@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from specctl.cli import main
-from specctl.impact import impact_baseline_path, refresh_impact_baseline, scan_impact
+from specctl.impact import build_gate_messages, impact_baseline_path, refresh_impact_baseline, scan_impact
 from specctl.validators.project import lint_project
 
 
@@ -40,9 +40,19 @@ def test_lint_warns_for_open_impact_suspects(tmp_path: Path) -> None:
     assert main(["init", "--root", str(root)]) == 0
     assert main(["feature", "create", "--root", str(root), "--name", "LintImpact", "--owner", "owner@example.com"]) == 0
 
-    messages, _, oneshot_stats = lint_project(root)
+    messages, _, _ = lint_project(root)
     assert any(message.code == "IMPACT_SUSPECT_OPEN" for message in messages)
-    assert oneshot_stats.impact_suspects_open > 0
+
+
+def test_gate_message_does_not_duplicate_refresh_hint(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    impact_baseline_path(root).unlink()
+
+    messages = build_gate_messages(root, feature_ids={"F-001"}, command_name="approve")
+    assert len(messages) == 1
+    assert messages[0].message.count("Run `specctl impact refresh --root .`.") == 1
 
 
 def test_check_strict_fails_for_open_impact_warnings(tmp_path: Path) -> None:

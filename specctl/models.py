@@ -55,8 +55,6 @@ class OneShotStats:
     blockers_opened: int = 0
     blockers_resolved: int = 0
     placeholder_leakage_count: int = 0
-    impact_suspects_open: int = 0
-    impact_features_tracked: int = 0
 
 
 @dataclass(frozen=True)

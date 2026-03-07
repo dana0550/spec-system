@@ -124,8 +124,6 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
             )
 
     impact_scan = scan_impact(root)
-    oneshot_stats.impact_suspects_open = len(impact_scan.suspects)
-    oneshot_stats.impact_features_tracked = impact_scan.features_tracked
     messages.extend(build_lint_messages(root, impact_scan))
 
     return messages, stats, oneshot_stats
