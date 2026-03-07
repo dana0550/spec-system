@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from specctl.io_utils import now_date, write_text
+from specctl.io_utils import now_date, now_timestamp, write_text
 
 
 def run(args) -> int:
@@ -129,7 +129,7 @@ def run(args) -> int:
             [
                 "{",
                 '  "features": {},',
-                f'  "generated_at": "{now_date()}",',
+                f'  "generated_at": "{now_timestamp()}",',
                 '  "schema_version": "1"',
                 "}",
             ]
