@@ -470,9 +470,9 @@ def test_report_json_includes_runs_total(tmp_path: Path, monkeypatch, capsys) ->
     root.mkdir()
 
     def lint_stub(_root: Path):
-        return [], TraceabilityStats(), OneShotStats(epics_total=2, runs_total=7)
+        return [], TraceabilityStats(), OneShotStats(epics_total=2, runs_total=7), None
 
-    monkeypatch.setattr(report_command, "lint_project", lint_stub)
+    monkeypatch.setattr(report_command, "lint_project_with_impact", lint_stub)
     assert main(["report", "--root", str(root), "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["epics_total"] == 2
