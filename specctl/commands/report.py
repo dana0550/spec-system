@@ -4,13 +4,15 @@ import json
 
 from specctl.command_utils import project_root
 from specctl.impact import scan_impact
-from specctl.validators.project import lint_project
+from specctl.validators.project import get_last_impact_scan, lint_project
 
 
 def run(args) -> int:
     root = project_root(args.root)
     messages, stats, oneshot_stats = lint_project(root)
-    impact_scan = scan_impact(root)
+    impact_scan = get_last_impact_scan()
+    if impact_scan is None:
+        impact_scan = scan_impact(root)
     errors = sum(1 for m in messages if m.severity == "ERROR")
     warnings = sum(1 for m in messages if m.severity == "WARN")
 
