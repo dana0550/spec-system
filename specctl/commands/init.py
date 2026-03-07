@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from specctl.io_utils import now_date, write_text
+from specctl.io_utils import now_date, now_timestamp, write_text
 
 
 def run(args) -> int:
@@ -22,7 +22,7 @@ def run(args) -> int:
                 "---",
                 "doc_type: master_spec",
                 "product_name: TBD",
-                "version: 2.1.0",
+                "version: 2.2.0",
                 "status: active",
                 "owners: []",
                 f"last_reviewed: {now_date()}",
@@ -41,7 +41,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: steering",
-                "version: 2.1.0",
+                "version: 2.2.0",
                 f"last_reviewed: {now_date()}",
                 "---",
                 "# Steering",
@@ -60,7 +60,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_index",
-                "version: 2.1.0",
+                "version: 2.2.0",
                 f"last_synced: {now_date()}",
                 "---",
                 "# Features Index",
@@ -78,7 +78,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: epic_index",
-                "version: 2.1.0",
+                "version: 2.2.0",
                 f"last_synced: {now_date()}",
                 "---",
                 "# Epics Index",
@@ -111,13 +111,27 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: traceability",
-                "version: 2.1.0",
+                "version: 2.2.0",
                 f"last_rendered: {now_date()}",
                 "---",
                 "# Traceability Report",
                 "",
                 "| Metric | Value |",
                 "|---|---:|",
+            ]
+        )
+        + "\n",
+    )
+
+    write_text(
+        docs / ".specctl" / "impact-baseline.json",
+        "\n".join(
+            [
+                "{",
+                '  "features": {},',
+                f'  "generated_at": "{now_timestamp()}",',
+                '  "schema_version": "1"',
+                "}",
             ]
         )
         + "\n",
@@ -141,5 +155,5 @@ def run(args) -> int:
         + "\n",
     )
 
-    print(f"Initialized Spec System v2.1 at {docs}")
+    print(f"Initialized Spec System v2.2 at {docs}")
     return 0

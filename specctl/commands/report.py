@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 
 from specctl.command_utils import project_root
-from specctl.validators.project import lint_project
+from specctl.validators.project import lint_project_with_impact
 
 
 def run(args) -> int:
     root = project_root(args.root)
-    messages, stats, oneshot_stats = lint_project(root)
+    messages, stats, oneshot_stats, impact_scan = lint_project_with_impact(root)
     errors = sum(1 for m in messages if m.severity == "ERROR")
     warnings = sum(1 for m in messages if m.severity == "WARN")
 
@@ -28,6 +28,8 @@ def run(args) -> int:
         "blockers_opened": oneshot_stats.blockers_opened,
         "blockers_resolved": oneshot_stats.blockers_resolved,
         "placeholder_leakage_count": oneshot_stats.placeholder_leakage_count,
+        "impact_suspects_open": len(impact_scan.suspects) if impact_scan is not None else 0,
+        "impact_features_tracked": impact_scan.features_tracked if impact_scan is not None else 0,
     }
 
     if args.json:

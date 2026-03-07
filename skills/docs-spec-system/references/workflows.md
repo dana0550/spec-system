@@ -1,4 +1,4 @@
-# Workflows (v2.1)
+# Workflows (v2.2)
 
 All operations are phase-gated and validated with `specctl`.
 
@@ -7,7 +7,8 @@ All operations are phase-gated and validated with `specctl`.
 1. Run `specctl init`.
 2. Add first feature with `specctl feature create`.
 3. Run `specctl render`.
-4. Run `specctl check`.
+4. Run `specctl impact refresh`.
+5. Run `specctl check`.
 
 Acceptance:
 
@@ -21,12 +22,14 @@ Acceptance:
 3. Add design mappings in `design.md`.
 4. Add implementation tasks in `tasks.md`.
 5. Add scenario evidence placeholders in `verification.md`.
-6. Run `specctl check`.
+6. Run `specctl impact scan`.
+7. Run `specctl check`.
 
 Acceptance:
 
 - All IDs present and linked.
 - Traceability chain complete.
+- Impact suspects are either resolved or explicitly acknowledged.
 
 ## 3) Add Epic (Automatic Feature Tree + One-Shot Contract)
 
@@ -43,7 +46,8 @@ Acceptance:
    - component leaf features generated per child
    - one-shot artifacts created (`brief/decomposition/oneshot/memory/runs`)
 4. Run `specctl epic check --epic-id <E-ID>`.
-5. Run `specctl check`.
+5. Run `specctl impact refresh`.
+6. Run `specctl check`.
 
 Acceptance:
 
@@ -57,32 +61,48 @@ Acceptance:
 2. Validate contract/run artifacts: `specctl oneshot check --epic-id <E-ID> [--run-id <RUN-ID>]`.
 3. If needed, continue run: `specctl oneshot resume --epic-id <E-ID> --run-id <RUN-ID>`.
 4. Close blockers and remove placeholders.
-5. Finalize: `specctl oneshot finalize --epic-id <E-ID> --run-id <RUN-ID>`.
-6. Report: `specctl oneshot report --epic-id <E-ID>`.
+5. Resolve impact suspects (`specctl impact scan`) and refresh baseline (`specctl impact refresh [--ack-upstream]`).
+6. Finalize: `specctl oneshot finalize --epic-id <E-ID> --run-id <RUN-ID>`.
+7. Report: `specctl oneshot report --epic-id <E-ID>`.
 
 Acceptance:
 
 - Run completes with zero open blockers.
 - No unresolved `ONESHOT-BLOCKER:*` markers remain.
+- No open impact suspects remain in finalize scope.
 - Scoped features and epic are marked `done`.
 
 ## 5) Phase Approvals
 
 1. Requirements approval:
    - Ensure requirements quality and traceability.
+   - Resolve impact suspects with `specctl impact refresh [--ack-upstream]`.
    - Run `specctl approve --feature-id <F-ID> --phase requirements`.
 2. Design approval:
    - Ensure design maps all requirements.
+   - Resolve impact suspects with `specctl impact refresh [--ack-upstream]`.
    - Run `specctl approve --feature-id <F-ID> --phase design`.
 3. Tasks approval:
    - Ensure tasks map to requirement/design IDs.
+   - Resolve impact suspects with `specctl impact refresh [--ack-upstream]`.
    - Run `specctl approve --feature-id <F-ID> --phase tasks`.
 
 Acceptance:
 
 - Transition command succeeds with no lifecycle violation.
 
-## 6) Migration (v1 -> v2)
+## 6) Impact Baseline Maintenance
+
+1. Run `specctl impact scan` to identify suspect links.
+2. Update downstream artifacts where needed.
+3. Run `specctl impact refresh`.
+4. If downstream text is intentionally unchanged, run `specctl impact refresh --ack-upstream`.
+
+Acceptance:
+
+- `specctl impact scan` returns zero open suspects.
+
+## 7) Migration (v1 -> v2)
 
 1. Run `specctl migrate-v1-to-v2`.
 2. Review generated `docs/MIGRATION_REPORT.md`.
@@ -95,7 +115,7 @@ Acceptance:
 - `FEATURES.md` paths point to v2 requirements docs.
 - No blocking errors remain.
 
-## 7) Bugfix Spec Workflow
+## 8) Bugfix Spec Workflow
 
 1. Create or update feature artifacts for the affected capability.
 2. Add regression scenario (`S-*`) describing failing behavior.
@@ -108,7 +128,7 @@ Acceptance:
 - Regression scenario has evidence.
 - Traceability chain remains complete.
 
-## 8) Deprecation Workflow
+## 9) Deprecation Workflow
 
 1. Set feature status to `deprecated` in `FEATURES.md`.
 2. Preserve feature artifact folder for historical traceability.

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from specctl.command_utils import format_message
 from specctl.constants import APPROVAL_TRANSITIONS
 from specctl.feature_index import read_feature_rows, write_feature_rows
+from specctl.impact import build_gate_messages
 from specctl.io_utils import set_frontmatter_value
 
 
@@ -30,6 +32,11 @@ def run(args) -> int:
             print(
                 f"[ERROR] Transition blocked for {row.feature_id}: expected '{expected_from}', found '{row.status}'"
             )
+            return 1
+        impact_messages = build_gate_messages(root, {row.feature_id}, command_name="approve")
+        if impact_messages:
+            for message in impact_messages:
+                print(format_message(message))
             return 1
         row.status = target
         write_feature_rows(features_path, rows)

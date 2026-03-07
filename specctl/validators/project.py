@@ -4,15 +4,22 @@ from pathlib import Path
 
 from specctl.constants import REQUIRED_DOC_FILES
 from specctl.feature_index import read_feature_rows
-from specctl.models import FeatureRow, LintMessage, OneShotStats, TraceabilityStats
+from specctl.impact import build_lint_messages, scan_impact
+from specctl.models import FeatureRow, ImpactScanResult, LintMessage, OneShotStats, TraceabilityStats
 from specctl.validators.epics import validate_epics
 from specctl.validators.ids import validate_feature_ids
 from specctl.validators.lifecycle import validate_statuses
 from specctl.validators.requirements import validate_requirements_file
 from specctl.validators.traceability import validate_feature_traceability
 
-
 def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneShotStats]:
+    messages, stats, oneshot_stats, _ = lint_project_with_impact(root)
+    return messages, stats, oneshot_stats
+
+
+def lint_project_with_impact(
+    root: Path,
+) -> tuple[list[LintMessage], TraceabilityStats, OneShotStats, ImpactScanResult | None]:
     messages: list[LintMessage] = []
     stats = TraceabilityStats()
     oneshot_stats = OneShotStats()
@@ -20,7 +27,7 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
     docs_dir = root / "docs"
     if not docs_dir.exists():
         messages.append(LintMessage("ERROR", "DOCS_MISSING", "docs/ directory is missing", docs_dir))
-        return messages, stats, oneshot_stats
+        return messages, stats, oneshot_stats, None
 
     for required in sorted(REQUIRED_DOC_FILES):
         required_path = docs_dir / required
@@ -83,7 +90,7 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
                 path=features_root,
             )
         )
-        return messages, stats, oneshot_stats
+        return messages, stats, oneshot_stats, None
 
     expected_feature_dirs: set[Path] = set()
     for row in rows:
@@ -122,7 +129,10 @@ def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneS
                 )
             )
 
-    return messages, stats, oneshot_stats
+    impact_scan = scan_impact(root)
+    messages.extend(build_lint_messages(root, impact_scan))
+
+    return messages, stats, oneshot_stats, impact_scan
 
 
 def validate_feature_hierarchy(rows: list[FeatureRow], features_index_path: Path) -> list[LintMessage]:
