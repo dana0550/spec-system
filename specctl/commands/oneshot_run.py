@@ -4,6 +4,7 @@ from pathlib import Path
 
 from specctl.commands.oneshot_common import load_epic_and_contract, write_run_state
 from specctl.commands.oneshot_runtime import CheckpointExecutionConfig, finalize_run_status, process_checkpoint, write_summary
+from specctl.epic_index import read_epic_rows, write_epic_rows
 from specctl.io_utils import now_timestamp, write_text
 from specctl.oneshot_utils import empty_blocker_ledger, new_run_id, parse_blockers, write_memory_files
 
@@ -31,6 +32,19 @@ def run(args) -> int:
     write_text(run_dir / "events.jsonl", "")
 
     runner = args.runner or contract.get("runner", "codex")
+
+    if epic.status == "planning":
+        epics_path = root / "docs" / "EPICS.md"
+        epic_rows = read_epic_rows(epics_path)
+        updated = False
+        for row in epic_rows:
+            if row.epic_id == epic.epic_id:
+                row.status = "implementing"
+                updated = True
+        if updated:
+            write_epic_rows(epics_path, epic_rows, version="2.3.0")
+            epic.status = "implementing"
+
     state = {
         "epic_id": epic.epic_id,
         "run_id": run_id,

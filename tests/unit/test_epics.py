@@ -65,6 +65,8 @@ def test_oneshot_check_rejects_checkpoint_cycles(tmp_path: Path) -> None:
                 "owner@example.com",
                 "--brief",
                 str(brief),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -98,6 +100,8 @@ def test_oneshot_check_handles_non_list_scope_feature_ids(tmp_path: Path) -> Non
                 "owner@example.com",
                 "--brief",
                 str(brief),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0

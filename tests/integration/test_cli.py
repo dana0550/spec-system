@@ -15,6 +15,7 @@ from specctl.commands import oneshot_finalize as oneshot_finalize_command
 from specctl.commands import oneshot_resume as oneshot_resume_command
 from specctl.commands import render as render_command
 from specctl.commands import report as report_command
+from specctl.constants import NEEDS_INPUT_EXIT_CODE
 from specctl.feature_index import read_feature_rows
 from specctl.models import OneShotStats, TraceabilityStats
 from specctl.oneshot_utils import parse_blockers
@@ -573,6 +574,8 @@ def test_oneshot_finalize_blocks_until_impact_refresh_ack(tmp_path: Path) -> Non
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -725,6 +728,8 @@ def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -745,6 +750,236 @@ def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None
     assert oneshot["checkpoint_graph"][0]["depends_on"] == []
     assert oneshot["checkpoint_graph"][1]["depends_on"] == [oneshot["checkpoint_graph"][0]["checkpoint_id"]]
 
+
+def test_epic_create_agentic_noninteractive_requires_question_pack(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    question_pack = root / "pending-questions.yaml"
+    _write_epic_brief(brief_path, include_ui=True)
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticMissingAnswers",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--no-interactive",
+            "--question-pack-out",
+            str(question_pack),
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    assert question_pack.exists()
+    question_payload = yaml.safe_load(question_pack.read_text(encoding="utf-8"))
+    question_ids = {row["question_id"] for row in question_payload["questions"]}
+    assert "Q-AGENTIC-001" in question_ids
+    assert "Q-AGENTIC-002" in question_ids
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 |" not in epics_text
+
+
+def test_epic_create_agentic_with_answers_writes_planning_epic(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve activation conversion",
+                "Q-AGENTIC-002: SOC2 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AgenticOnboarding",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | AgenticOnboarding | planning | F-001 |" in epics_text
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    assert (epic_dir / "research.md").exists()
+    assert (epic_dir / "questions.yaml").exists()
+    assert (epic_dir / "answers.yaml").exists()
+    assert (epic_dir / "agentic_state.json").exists()
+
+    oneshot = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert "generation_run_id" in oneshot
+    assert oneshot["synthesis_quality_profile"]["minimums"]["requirements"] == 3
+    assert oneshot["approval_gates"]["mode"] == "two-gate"
+
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert rows
+    assert all(row.status == "tasks_draft" for row in rows)
+
+    first_feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    req_text = (first_feature_dir / "requirements.md").read_text(encoding="utf-8")
+    design_text = (first_feature_dir / "design.md").read_text(encoding="utf-8")
+    verification_text = (first_feature_dir / "verification.md").read_text(encoding="utf-8")
+    assert len(re.findall(r"^\s*[-*]\s*R-F001(?:\.\d{2})*-\d{3}", req_text, flags=re.MULTILINE)) >= 3
+    assert "## Architecture" in design_text
+    assert "## Requirement Mapping" in design_text
+    assert "TBD" not in verification_text.upper()
+
+
+def test_oneshot_run_transitions_planning_epic_to_implementing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Reduce onboarding churn",
+                "Q-AGENTIC-002: ISO27001 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AgenticLifecycle",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | AgenticLifecycle | implementing | F-001 |" in epics_text
+
+
+def test_epic_create_agentic_supports_claude_runner(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve operator throughput",
+                "Q-AGENTIC-002: GDPR controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ClaudeRunnerEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--runner",
+                "claude",
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot_payload["runner"] == "claude"
+
+
+def test_epic_migrate_agentic_check_and_apply(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrationTarget",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--check"]) == 1
+    assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--apply"]) == 0
+    assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--apply"]) == 0
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    assert (epic_dir / "research.md").exists()
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot_payload["synthesis_quality_profile"]["minimums"]["tasks"] == 3
 
 def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
@@ -767,6 +1002,8 @@ def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 1
@@ -800,6 +1037,8 @@ def test_epic_create_passes_precomputed_stats_to_render(tmp_path: Path, monkeypa
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -826,6 +1065,8 @@ def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) ->
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -856,6 +1097,8 @@ def test_oneshot_run_uses_soft_blocker_for_non_integrity_failure(tmp_path: Path)
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -897,6 +1140,8 @@ def test_oneshot_run_handles_missing_validation_binary_without_crashing(tmp_path
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -939,6 +1184,8 @@ def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -978,6 +1225,8 @@ def test_oneshot_run_precreates_events_log_when_no_checkpoint_executes(tmp_path:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1017,6 +1266,8 @@ def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1057,6 +1308,8 @@ def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1093,6 +1346,8 @@ def test_oneshot_finalize_short_circuits_validation_when_blocked(tmp_path: Path,
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1131,6 +1386,8 @@ def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1178,6 +1435,8 @@ def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: 
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1233,6 +1492,8 @@ def test_oneshot_finalize_continues_rollback_when_one_restore_fails(tmp_path: Pa
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1291,6 +1552,8 @@ def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monke
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1343,6 +1606,8 @@ def test_oneshot_finalize_rolls_back_when_run_state_is_invalid(tmp_path: Path) -
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1390,6 +1655,8 @@ def test_oneshot_finalize_passes_precomputed_stats_to_render(tmp_path: Path, mon
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1431,6 +1698,8 @@ def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path)
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1477,6 +1746,8 @@ def test_oneshot_resume_does_not_duplicate_open_blockers_for_retried_checkpoint(
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1523,6 +1794,8 @@ def test_oneshot_resume_processes_in_progress_checkpoint(tmp_path: Path) -> None
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1575,6 +1848,8 @@ def test_oneshot_resume_handles_missing_validation_binary_without_crashing(tmp_p
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1623,6 +1898,8 @@ def test_oneshot_run_retries_pending_checkpoints_after_late_dependency_pass(tmp_
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1665,6 +1942,8 @@ def test_oneshot_resume_retries_pending_checkpoints_after_late_dependency_pass(t
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1717,6 +1996,8 @@ def test_oneshot_resume_stops_when_status_leaves_resumable_states(tmp_path: Path
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0

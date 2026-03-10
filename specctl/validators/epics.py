@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from specctl.agentic_epic import validate_feature_quality
 from specctl.constants import EPIC_STATUSES
 from specctl.epic_index import read_epic_rows
 from specctl.models import FeatureRow, LintMessage, OneShotStats
@@ -100,8 +101,10 @@ def validate_epics(root: Path, feature_rows: list[FeatureRow]) -> tuple[list[Lin
                     )
                 )
 
-        oneshot_msgs, _ = validate_oneshot_contract(root, row, feature_by_id)
+        oneshot_msgs, payload = validate_oneshot_contract(root, row, feature_by_id)
         messages.extend(oneshot_msgs)
+        if payload:
+            messages.extend(_validate_agentic_profile(root, row, payload, feature_by_id))
 
         messages.extend(validate_run_artifacts(epic_dir))
         run_stats = collect_run_stats(epic_dir / "runs")
@@ -128,3 +131,57 @@ def validate_epics(root: Path, feature_rows: list[FeatureRow]) -> tuple[list[Lin
         )
 
     return messages, stats
+
+
+def _validate_agentic_profile(
+    root: Path,
+    epic_row,
+    payload: dict,
+    feature_by_id: dict[str, FeatureRow],
+) -> list[LintMessage]:
+    messages: list[LintMessage] = []
+    profile = payload.get("synthesis_quality_profile")
+    if not isinstance(profile, dict):
+        return messages
+
+    docs = root / "docs"
+    epic_dir = docs / epic_row.epic_path
+    research_log = profile.get("research_log", "research.md")
+    research_path = epic_dir / str(research_log)
+    if not research_path.exists():
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="AGENTIC_RESEARCH_LOG_MISSING",
+                message=f"Research log missing for agentic epic: {research_log}",
+                path=research_path,
+            )
+        )
+    else:
+        text = research_path.read_text(encoding="utf-8")
+        if "| Finding ID | Source | Type | Summary |" not in text:
+            messages.append(
+                LintMessage(
+                    severity="ERROR",
+                    code="AGENTIC_RESEARCH_LOG_INVALID",
+                    message="Research log must include canonical findings table header",
+                    path=research_path,
+                )
+            )
+
+    for feature_id in payload.get("scope_feature_ids", []):
+        row = feature_by_id.get(feature_id)
+        if row is None:
+            continue
+        feature_dir = (docs / row.spec_path).parent
+        issues = validate_feature_quality(feature_dir)
+        for issue in issues:
+            messages.append(
+                LintMessage(
+                    severity="ERROR",
+                    code="AGENTIC_SPEC_QUALITY",
+                    message=f"{feature_id}: {issue}",
+                    path=feature_dir,
+                )
+            )
+    return messages
