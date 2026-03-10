@@ -1,6 +1,6 @@
-# Spec System Rules (v2.2)
+# Spec System Rules (v2.3)
 
-Release: `docs-spec-system` v2.2.0.
+Release: `docs-spec-system` v2.3.0.
 
 ## Canonical Model
 
@@ -15,6 +15,10 @@ Release: `docs-spec-system` v2.2.0.
   - `brief.md`
   - `decomposition.yaml`
   - `oneshot.yaml`
+  - `research.md`
+  - `questions.yaml`
+  - `answers.yaml`
+  - `agentic_state.json`
   - `memory/`
   - `runs/`
 - `docs/PRODUCT_MAP.md` and `docs/TRACEABILITY.md` are generated artifacts.
@@ -40,6 +44,10 @@ docs/
       brief.md
       decomposition.yaml
       oneshot.yaml
+      research.md
+      questions.yaml
+      answers.yaml
+      agentic_state.json
       memory/
       runs/
   features/
@@ -131,6 +139,12 @@ Global contract:
 Epic contract:
 
 - `brief -> decomposition -> oneshot contract -> run checkpoints -> blocker ledger -> finalize evidence`
+- Agentic defaults:
+  - `epic create` defaults to `agentic` mode with deterministic fallback.
+  - Missing required answers in non-interactive flows MUST emit question pack and exit with code `2`.
+  - Epic status after successful agentic create MUST be `planning`.
+  - Epic status MUST transition to `implementing` when one-shot run begins.
+  - Agentic epic quality baseline MUST satisfy: `>=3` requirements, `>=2` scenarios, `>=2` design decisions, `>=3` tasks.
 - Epic one-shot finalize requires:
   - zero open blockers
   - zero unresolved `ONESHOT-BLOCKER:*` markers
@@ -156,6 +170,7 @@ Required command surface:
 - `specctl impact scan`
 - `specctl impact refresh`
 - `specctl epic create`
+- `specctl epic migrate-agentic`
 - `specctl epic check`
 - `specctl oneshot run`
 - `specctl oneshot resume`
@@ -172,6 +187,7 @@ Required command surface:
 ## Severity Policy
 
 - `ERROR`: blocking (`exit 1`)
+- `NEEDS_INPUT`: question pack emitted and answer input required (`exit 2`)
 - `WARN`: non-blocking unless strict mode
 - `INFO`: advisory
 

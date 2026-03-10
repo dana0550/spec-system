@@ -6,6 +6,20 @@
   "scope_feature_ids": [
     "F-XXX"
   ],
+  "generation_run_id": "GEN-YYYYMMDD-HHMMSS",
+  "nodes": [
+    {
+      "feature_id": "F-XXX",
+      "parent_id": "",
+      "name": "<Epic Name>",
+      "node_type": "epic_root",
+      "rationale": "<why this node exists>",
+      "confidence": 0.85,
+      "source_refs": [
+        "FIND-BRIEF-001"
+      ]
+    }
+  ],
   "children": [
     {
       "feature_id": "F-XXX.01",

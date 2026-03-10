@@ -5,13 +5,13 @@ description: Operate the Spec System v2 contract-first workflow with phase gates
 
 # Docs Spec System v2
 
-Run all docs-spec operations through the phase-gated v2.2 system.
+Run all docs-spec operations through the phase-gated v2.3 system.
 
 ## Runbook
 
 1. Read `references/spec-system-rules.md` for mandatory schemas and gate invariants.
 2. Select the workflow in `references/workflows.md` that matches the requested change.
-3. Use `specctl` as the primary interface (`feature`, `epic`, `oneshot`, `impact`, `lint`, `render`, `check`, `approve`).
+3. Use `specctl` as the primary interface (`feature`, `epic`, `oneshot`, `impact`, `lint`, `render`, `check`, `approve`, `epic migrate-agentic`).
 4. Keep requirements, design, tasks, and verification artifacts synchronized per feature.
 5. Enforce `R -> D -> T -> S -> evidence` traceability before completion.
 6. For epic work, enforce one-shot contract execution (`run -> check -> finalize`) with blockers/memory artifacts.

@@ -1,4 +1,4 @@
-# Release And PR Workflow (v2.2)
+# Release And PR Workflow (v2.3)
 
 ## Required Validation Before PR
 
@@ -8,6 +8,7 @@
 4. `specctl impact scan`
 5. Unit and integration tests
 6. For epic changes, `specctl epic check --epic-id <E-ID>` and `specctl oneshot check --epic-id <E-ID>`
+7. For migration changes, `specctl epic migrate-agentic --check [--epic-id <E-ID>]`
 
 Blocking condition:
 

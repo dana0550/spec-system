@@ -5,6 +5,22 @@
     "F-XXX"
   ],
   "runner": "codex",
+  "generation_run_id": "GEN-YYYYMMDD-HHMMSS",
+  "approval_gates": {
+    "mode": "two-gate",
+    "decomposition": "yes",
+    "commit": "yes"
+  },
+  "synthesis_quality_profile": {
+    "minimums": {
+      "requirements": 3,
+      "scenarios": 2,
+      "design_decisions": 2,
+      "tasks": 3
+    },
+    "research_log": "research.md",
+    "requires_no_tbd_evidence": true
+  },
   "checkpoint_graph": [
     {
       "checkpoint_id": "C-EXXX-001",

@@ -1,4 +1,4 @@
-# Workflows (v2.2)
+# Workflows (v2.3)
 
 All operations are phase-gated and validated with `specctl`.
 
@@ -31,7 +31,7 @@ Acceptance:
 - Traceability chain complete.
 - Impact suspects are either resolved or explicitly acknowledged.
 
-## 3) Add Epic (Automatic Feature Tree + One-Shot Contract)
+## 3) Add Epic (Agentic Default + One-Shot Contract)
 
 1. Prepare brief with required sections:
    - `Vision`
@@ -39,19 +39,22 @@ Acceptance:
    - `User Journeys`
    - `Constraints`
    - `Non-Goals`
-2. Run `specctl epic create --name "<Epic>" --owner <owner> --brief <brief.md>`.
-3. Confirm epic scaffolding:
+2. Run `specctl epic create --name "<Epic>" --owner <owner> --brief <brief.md> [--answers-file <answers.yaml>]`.
+3. If command exits with `2`, resolve emitted question pack and re-run with `--answers-file`.
+4. Confirm epic scaffolding:
    - root feature created
-   - child features generated from journeys/outcomes
-   - component leaf features generated per child
+   - adaptive hierarchy generated from brief/context/research
+   - strict quality feature artifacts generated
    - one-shot artifacts created (`brief/decomposition/oneshot/memory/runs`)
-4. Run `specctl epic check --epic-id <E-ID>`.
-5. Run `specctl impact refresh`.
-6. Run `specctl check`.
+   - agentic artifacts created (`research/questions/answers/state`)
+5. Run `specctl epic check --epic-id <E-ID>`.
+6. Run `specctl impact refresh`.
+7. Run `specctl check`.
 
 Acceptance:
 
-- Epic tree is deterministic and linked in `FEATURES.md`.
+- Epic tree is linked in `FEATURES.md` and epic lifecycle is `planning` after create.
+- Scoped features satisfy strict quality minimums and required design schema sections.
 - Epic one-shot contract is valid and checkpoint graph maps to `T-*`.
 - No blocking errors from `specctl check`.
 
@@ -115,7 +118,20 @@ Acceptance:
 - `FEATURES.md` paths point to v2 requirements docs.
 - No blocking errors remain.
 
-## 8) Bugfix Spec Workflow
+## 8) Agentic Backfill Migration (existing epics)
+
+1. Run dry-run assessment: `specctl epic migrate-agentic --check [--epic-id <E-ID>]`.
+2. Review reported quality gaps by scoped feature.
+3. Apply migration: `specctl epic migrate-agentic --apply [--epic-id <E-ID>]`.
+4. Run `specctl check`.
+
+Acceptance:
+
+- Existing scoped features are backfilled to strict agentic quality baseline.
+- Epic includes `research.md` and `synthesis_quality_profile` metadata.
+- No blocking errors remain.
+
+## 9) Bugfix Spec Workflow
 
 1. Create or update feature artifacts for the affected capability.
 2. Add regression scenario (`S-*`) describing failing behavior.
@@ -128,7 +144,7 @@ Acceptance:
 - Regression scenario has evidence.
 - Traceability chain remains complete.
 
-## 9) Deprecation Workflow
+## 10) Deprecation Workflow
 
 1. Set feature status to `deprecated` in `FEATURES.md`.
 2. Preserve feature artifact folder for historical traceability.

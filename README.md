@@ -12,7 +12,7 @@
   <a href="https://github.com/dana0550/spec-system/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/dana0550/spec-system/ci.yml?branch=main&label=CI" alt="CI"></a>
   <a href="https://github.com/dana0550/spec-system/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/dana0550/spec-system/release.yml?label=Release" alt="Release"></a>
   <a href="https://github.com/dana0550/spec-system/releases"><img src="https://img.shields.io/github/v/release/dana0550/spec-system" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/specctl-v2.2.0-0E8A92" alt="specctl v2.2.0">
+  <img src="https://img.shields.io/badge/specctl-v2.3.0-0E8A92" alt="specctl v2.3.0">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
@@ -138,24 +138,30 @@ Minimal brief:
 - No redesign of external admin UI.
 ```
 
-### Create an epic (auto decomposition)
+### Create an epic (agentic by default)
 ```bash
 specctl epic create \
   --name "Billing Reliability" \
   --owner team@example.com \
-  --brief ./brief.md
+  --brief ./brief.md \
+  --answers-file ./agentic-answers.yaml \
+  --no-interactive
 ```
 
-Deterministic decomposition behavior:
+Agentic decomposition behavior:
 
-- each `User Journeys` bullet becomes a child feature
-- if no journeys exist, each `Outcomes` bullet becomes a child feature
-- each child gets component leaves:
-  - `Contract/API`
-  - `Domain/Data`
-  - `Execution/Integration`
-  - `Verification/Observability`
-- optional `UX/Client` is added when user-facing brief sections (`Vision`, `Outcomes`, `User Journeys`) include UI keywords (`ui`, `frontend`, `screen`, `workflow`, `form`, `dashboard`)
+- adaptive hierarchy is synthesized from brief + repo context (+ runner-mediated research when configured)
+- default quality baseline per feature: `>=3` requirements, `>=2` scenarios, `>=2` design decisions, `>=3` tasks
+- two approval gates are enforced by default (`decomposition` then `commit`)
+- missing required answers in non-interactive mode emit a question pack and exit with code `2`
+- deterministic behavior is still available via `--mode deterministic`
+
+Agentic epic artifacts:
+
+- `docs/epics/E-###-*/research.md` canonical source log
+- `docs/epics/E-###-*/questions.yaml` normalized question ledger
+- `docs/epics/E-###-*/answers.yaml` resolved answer ledger
+- `docs/epics/E-###-*/agentic_state.json` phase checkpoint state
 
 Minimal `oneshot.yaml` contract shape:
 
@@ -187,6 +193,17 @@ finalize_gates:
   require_full_traceability: true
   required_validation_commands:
     - python -m specctl.cli lint --root .
+generation_run_id: GEN-20260310-120000
+approval_gates:
+  mode: two-gate
+synthesis_quality_profile:
+  minimums:
+    requirements: 3
+    scenarios: 2
+    design_decisions: 2
+    tasks: 3
+  research_log: research.md
+  requires_no_tbd_evidence: true
 ```
 
 ### Execute and finalize one-shot
@@ -277,7 +294,15 @@ specctl feature check --feature-id F-###
 specctl impact scan [--feature-id F-###] [--json]
 specctl impact refresh [--feature-id F-###] [--ack-upstream]
 
-specctl epic create --name "..." --owner <owner> --brief ./brief.md
+specctl epic create --name "..." --owner <owner> --brief ./brief.md \
+  [--mode agentic|deterministic] \
+  [--runner codex|claude] \
+  [--interactive|--no-interactive] \
+  [--answers-file <path>] \
+  [--question-pack-out <path>] \
+  [--approval-mode two-gate|per-feature|none] \
+  [--research-depth deep|balanced|lean]
+specctl epic migrate-agentic [--epic-id E-###] [--check|--apply]
 specctl epic check --epic-id E-###
 
 specctl oneshot run --epic-id E-### [--runner codex|claude]
@@ -403,8 +428,8 @@ Manual tag flow from `main`:
 git fetch origin
 git switch main
 git pull --ff-only
-git tag -a v2.2.0 -m "docs-spec-system v2.2.0"
-git push origin v2.2.0
+git tag -a v2.3.0 -m "docs-spec-system v2.3.0"
+git push origin v2.3.0
 ```
 
 Automation in this repo:
