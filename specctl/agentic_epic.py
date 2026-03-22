@@ -12,6 +12,7 @@ import yaml
 from specctl.constants import AGENTIC_DESIGN_REQUIRED_SECTIONS, AGENTIC_QUALITY_MINIMUMS
 from specctl.io_utils import now_date, now_timestamp, read_text, write_text
 from specctl.models import FeatureRow
+from specctl.oneshot_utils import extract_bullets
 from specctl.runner_adapter import resolve_runner_command as resolve_runner_command_impl
 
 
@@ -92,8 +93,8 @@ def build_adaptive_nodes(
     root_feature_id: str,
     source_refs: list[str],
 ) -> list[dict[str, Any]]:
-    outcomes = _extract_bullets(brief_sections.get("Outcomes", ""))
-    journeys = _extract_bullets(brief_sections.get("User Journeys", ""))
+    outcomes = extract_bullets(brief_sections.get("Outcomes", ""))
+    journeys = extract_bullets(brief_sections.get("User Journeys", ""))
     seed_names = journeys if journeys else outcomes
     if not seed_names:
         seed_names = ["Core Capability"]
@@ -179,15 +180,6 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
     return out
 
 
-def _extract_bullets(section_text: str) -> list[str]:
-    bullets: list[str] = []
-    for line in section_text.splitlines():
-        match = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
-        if match:
-            bullets.append(match.group(1).strip())
-    return bullets
-
-
 def default_questions(root_name: str, brief_sections: dict[str, str]) -> list[AgenticQuestion]:
     questions = [
         AgenticQuestion(
@@ -204,7 +196,7 @@ def default_questions(root_name: str, brief_sections: dict[str, str]) -> list[Ag
         ),
     ]
 
-    journeys = _extract_bullets(brief_sections.get("User Journeys", ""))
+    journeys = extract_bullets(brief_sections.get("User Journeys", ""))
     for idx, journey in enumerate(journeys, start=1):
         questions.append(
             AgenticQuestion(
