@@ -981,6 +981,121 @@ def test_epic_migrate_agentic_check_and_apply(tmp_path: Path) -> None:
     oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     assert oneshot_payload["synthesis_quality_profile"]["minimums"]["tasks"] == 3
 
+
+def test_epic_migrate_agentic_honors_runner_and_answers_file(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrationAnswersTarget",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    answers = root / "migration-answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Custom migration KPI",
+                "Q-AGENTIC-002: Custom migration constraints",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner",
+                "claude",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+
+    feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    requirements = (feature_dir / "requirements.md").read_text(encoding="utf-8")
+    assert "Custom migration KPI" in requirements
+    assert "Custom migration constraints" in requirements
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot_payload["synthesis_quality_profile"]["migration_runner"] == "claude"
+
+
+def test_epic_migrate_agentic_emits_question_pack_when_required_answers_missing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrationQuestionPackTarget",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    question_pack = root / "migrate-questions.yaml"
+    rc = main(
+        [
+            "epic",
+            "migrate-agentic",
+            "--root",
+            str(root),
+            "--epic-id",
+            "E-001",
+            "--check",
+            "--no-interactive",
+            "--question-pack-out",
+            str(question_pack),
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    assert question_pack.exists()
+    payload = yaml.safe_load(question_pack.read_text(encoding="utf-8"))
+    question_ids = {row["question_id"] for row in payload["questions"]}
+    assert "Q-AGENTIC-001" in question_ids
+    assert "Q-AGENTIC-002" in question_ids
+
 def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()

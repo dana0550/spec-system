@@ -3,8 +3,18 @@ from __future__ import annotations
 from argparse import Namespace
 from pathlib import Path
 
-from specctl.agentic_epic import collect_repo_findings, synthesize_feature_artifacts, validate_feature_quality
+from specctl.agentic_epic import (
+    AgenticQuestion,
+    collect_repo_findings,
+    is_interactive_mode,
+    load_answers_file,
+    resolve_questions,
+    synthesize_feature_artifacts,
+    validate_feature_quality,
+    write_question_pack,
+)
 from specctl.commands import render
+from specctl.constants import NEEDS_INPUT_EXIT_CODE
 from specctl.epic_index import read_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
 from specctl.io_utils import now_date, set_frontmatter_value
@@ -27,6 +37,21 @@ def run(args) -> int:
             return 1
 
     dry_run = not bool(args.apply)
+    runner = args.runner or "codex"
+    interactive = is_interactive_mode(bool(getattr(args, "interactive", False)), bool(getattr(args, "no_interactive", False)))
+    answers_file = Path(args.answers_file).resolve() if getattr(args, "answers_file", None) else None
+    provided_answers = load_answers_file(answers_file)
+    question_pack_path = (
+        Path(args.question_pack_out).resolve()
+        if getattr(args, "question_pack_out", None)
+        else (root / "agentic-migrate-question-pack.yaml")
+    )
+    question_mode_enabled = bool(
+        getattr(args, "answers_file", None)
+        or getattr(args, "interactive", False)
+        or getattr(args, "no_interactive", False)
+        or getattr(args, "question_pack_out", None)
+    )
 
     findings = collect_repo_findings(root)
     upgrades: list[tuple[str, str, list[str]]] = []
@@ -43,6 +68,46 @@ def run(args) -> int:
         scope = payload.get("scope_feature_ids", [])
         if not isinstance(scope, list):
             scope = []
+
+        default_answers = {
+            "Q-AGENTIC-001": f"Backfilled KPI baseline for {epic.name}",
+            "Q-AGENTIC-002": "Backfilled constraints from existing brief and steering docs",
+        }
+        effective_answers = dict(default_answers)
+        effective_answers.update(provided_answers)
+        if question_mode_enabled:
+            questions = [
+                AgenticQuestion(
+                    question_id="Q-AGENTIC-001",
+                    text=f"What KPI should be prioritized for migrated epic '{epic.name}'?",
+                    required=True,
+                    source="migration",
+                ),
+                AgenticQuestion(
+                    question_id="Q-AGENTIC-002",
+                    text=f"Any additional migration constraints for epic '{epic.name}'?",
+                    required=True,
+                    source="migration",
+                ),
+            ]
+            resolved_answers, pending = resolve_questions(
+                questions=questions,
+                seed_answers=dict(provided_answers),
+                interactive=interactive,
+            )
+            if pending:
+                write_question_pack(
+                    question_pack_path,
+                    epic_name=epic.name,
+                    questions=pending,
+                    answers=resolved_answers,
+                )
+                print(
+                    f"[NEEDS_INPUT] Missing required migration answers for {epic.epic_id}; "
+                    f"wrote question pack to {question_pack_path}"
+                )
+                return NEEDS_INPUT_EXIT_CODE
+            effective_answers.update(resolved_answers)
 
         for feature_id in scope:
             row = feature_by_id.get(feature_id)
@@ -63,10 +128,7 @@ def run(args) -> int:
                 owner=row.owner,
                 root_feature_name=epic.name,
                 findings=findings,
-                answers={
-                    "Q-AGENTIC-001": f"Backfilled KPI baseline for {epic.name}",
-                    "Q-AGENTIC-002": "Backfilled constraints from existing brief and steering docs",
-                },
+                answers=effective_answers,
             )
             for filename, text in artifacts.items():
                 path = feature_dir / filename
@@ -90,6 +152,7 @@ def run(args) -> int:
             )
             profile.setdefault("research_log", "research.md")
             profile.setdefault("requires_no_tbd_evidence", True)
+            profile.setdefault("migration_runner", runner)
 
         payload.setdefault("approval_gates", {})
         if isinstance(payload["approval_gates"], dict):
@@ -124,6 +187,7 @@ def run(args) -> int:
                 path.write_text(
                     "{\n"
                     f'  "epic_id": "{epic.epic_id}",\n'
+                    f'  "runner": "{runner}",\n'
                     '  "status": "migration_backfilled"\n'
                     "}\n",
                     encoding="utf-8",

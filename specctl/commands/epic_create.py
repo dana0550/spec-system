@@ -631,9 +631,16 @@ def _merge_runner_nodes(base_nodes: list[dict[str, Any]], candidate_nodes: list[
     if not candidate_nodes:
         return base_nodes
 
+    if not base_nodes:
+        return base_nodes
+
     root = base_nodes[0]
-    merged: list[dict[str, Any]] = [root]
-    known_temp = {root.get("temp_id", "N-ROOT")}
+    merged: list[dict[str, Any]] = list(base_nodes)
+    known_temp = {
+        str(node.get("temp_id", "")).strip()
+        for node in merged
+        if isinstance(node, dict) and str(node.get("temp_id", "")).strip()
+    }
     for idx, node in enumerate(candidate_nodes, start=1):
         if not isinstance(node, dict):
             continue
@@ -657,7 +664,7 @@ def _merge_runner_nodes(base_nodes: list[dict[str, Any]], candidate_nodes: list[
         )
         known_temp.add(temp_id)
 
-    if len(merged) == 1:
+    if len(merged) == len(base_nodes):
         return base_nodes
     return merged
 
