@@ -17,7 +17,7 @@ from specctl.commands import render
 from specctl.constants import NEEDS_INPUT_EXIT_CODE
 from specctl.epic_index import read_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
-from specctl.io_utils import now_date, set_frontmatter_value
+from specctl.io_utils import now_date, set_frontmatter_value, write_text
 from specctl.oneshot_utils import collect_traceability_stats, dump_json_document, load_json_document
 
 
@@ -137,7 +137,7 @@ def run(args) -> int:
             )
             for filename, text in artifacts.items():
                 path = feature_dir / filename
-                path.write_text(text, encoding="utf-8")
+                write_text(path, text)
             updated_feature_ids.add(feature_id)
 
         if dry_run:
