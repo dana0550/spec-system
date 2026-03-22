@@ -17,7 +17,6 @@ from specctl.agentic_epic import (
     load_answers_file,
     merge_questions,
     resolve_questions,
-    resolve_runner_command,
     synthesize_feature_artifacts,
     write_agentic_artifacts,
     write_question_pack,
@@ -44,6 +43,7 @@ from specctl.runner_adapter import (
     default_runner_policy,
     ensure_runner_available,
     invoke_runner_adapter,
+    resolve_runner_command,
     validate_codex_surface,
 )
 from specctl.validators.ids import FEATURE_ID_RE

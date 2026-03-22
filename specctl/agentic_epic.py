@@ -13,7 +13,6 @@ from specctl.constants import AGENTIC_DESIGN_REQUIRED_SECTIONS, AGENTIC_QUALITY_
 from specctl.io_utils import now_date, now_timestamp, read_text, write_text
 from specctl.models import FeatureRow
 from specctl.oneshot_utils import extract_bullets
-from specctl.runner_adapter import resolve_runner_command as resolve_runner_command_impl
 
 
 @dataclass
@@ -22,19 +21,6 @@ class AgenticQuestion:
     text: str
     required: bool = True
     source: str = "system"
-
-
-def resolve_runner_command(
-    runner: str,
-    *,
-    codex_surface: str = "auto",
-    codex_profile: str = "spec-agentic",
-) -> str:
-    return resolve_runner_command_impl(
-        runner,
-        codex_surface=codex_surface,
-        codex_profile=codex_profile,
-    )
 
 
 def load_answers_file(path: Path | None) -> dict[str, str]:

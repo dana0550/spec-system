@@ -368,17 +368,17 @@ def run(args) -> int:
             path = epic_dir / aux
             if path.exists():
                 continue
-            if aux.endswith(".json"):
-                path.write_text(
-                    "{\n"
-                    f'  "epic_id": "{epic.epic_id}",\n'
-                    f'  "runner": "{runner}",\n'
-                    f'  "runner_policy": "{runner_policy}",\n'
-                    f'  "codex_surface": "{codex_surface}",\n'
-                    f'  "codex_profile": "{codex_profile}",\n'
-                    '  "status": "migration_backfilled"\n'
-                    "}\n",
-                    encoding="utf-8",
+            if aux == "agentic_state.json":
+                dump_json_document(
+                    path,
+                    {
+                        "epic_id": epic.epic_id,
+                        "runner": runner,
+                        "runner_policy": runner_policy,
+                        "codex_surface": codex_surface,
+                        "codex_profile": codex_profile,
+                        "status": "migration_backfilled",
+                    },
                 )
             elif aux == "answers.yaml":
                 dump_json_document(path, effective_answers)
