@@ -22,7 +22,7 @@ def run(args) -> int:
                 "---",
                 "doc_type: master_spec",
                 "product_name: TBD",
-                "version: 2.3.0",
+                "version: 2.4.0",
                 "status: active",
                 "owners: []",
                 f"last_reviewed: {now_date()}",
@@ -41,7 +41,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: steering",
-                "version: 2.3.0",
+                "version: 2.4.0",
                 f"last_reviewed: {now_date()}",
                 "---",
                 "# Steering",
@@ -60,7 +60,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: feature_index",
-                "version: 2.3.0",
+                "version: 2.4.0",
                 f"last_synced: {now_date()}",
                 "---",
                 "# Features Index",
@@ -78,7 +78,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: epic_index",
-                "version: 2.3.0",
+                "version: 2.4.0",
                 f"last_synced: {now_date()}",
                 "---",
                 "# Epics Index",
@@ -111,7 +111,7 @@ def run(args) -> int:
             [
                 "---",
                 "doc_type: traceability",
-                "version: 2.3.0",
+                "version: 2.4.0",
                 f"last_rendered: {now_date()}",
                 "---",
                 "# Traceability Report",
@@ -155,5 +155,5 @@ def run(args) -> int:
         + "\n",
     )
 
-    print(f"Initialized Spec System v2.3 at {docs}")
+    print(f"Initialized Spec System v2.4 at {docs}")
     return 0

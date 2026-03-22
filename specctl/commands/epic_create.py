@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
+import json
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,6 @@ from specctl.agentic_epic import (
     build_adaptive_nodes,
     collect_repo_findings,
     default_questions,
-    invoke_runner,
     is_interactive_mode,
     load_answers_file,
     merge_questions,
@@ -36,6 +36,13 @@ from specctl.oneshot_utils import (
     extract_bullets,
     needs_ui_components,
     parse_brief_sections,
+)
+from specctl.runner_adapter import (
+    behavior_for_depth,
+    default_runner_policy,
+    ensure_runner_available,
+    invoke_runner_adapter,
+    validate_codex_surface,
 )
 from specctl.validators.ids import FEATURE_ID_RE
 
@@ -148,7 +155,7 @@ def _run_deterministic(args) -> int:
         return 1
 
     working_rows.sort(key=lambda row: row.feature_id)
-    write_feature_rows(features_path, working_rows, version="2.3.0")
+    write_feature_rows(features_path, working_rows, version="2.4.0")
 
     epic_row = EpicRow(
         epic_id=epic_id,
@@ -161,7 +168,7 @@ def _run_deterministic(args) -> int:
     )
     epic_rows.append(epic_row)
     epic_rows.sort(key=lambda row: row.epic_id)
-    write_epic_rows(epics_path, epic_rows, version="2.3.0")
+    write_epic_rows(epics_path, epic_rows, version="2.4.0")
 
     epic_dir = docs / epic_row.epic_path
     (epic_dir / "memory").mkdir(parents=True, exist_ok=True)
@@ -311,6 +318,10 @@ def _run_agentic(args) -> int:
     owner = args.owner or "unassigned"
     runner = args.runner or "codex"
     research_depth = getattr(args, "research_depth", "deep") or "deep"
+    depth_behavior = behavior_for_depth(research_depth)
+    codex_surface = validate_codex_surface(getattr(args, "codex_surface", "auto"))
+    codex_profile = (getattr(args, "codex_profile", "spec-agentic") or "spec-agentic").strip()
+    runner_policy = default_runner_policy("agentic", runner, getattr(args, "runner_policy", None))
     interactive = is_interactive_mode(bool(getattr(args, "interactive", False)), bool(getattr(args, "no_interactive", False)))
 
     answers_file = Path(args.answers_file).resolve() if getattr(args, "answers_file", None) else None
@@ -338,32 +349,140 @@ def _run_agentic(args) -> int:
     questions = default_questions(args.name.strip(), sections)
 
     runner_command = resolve_runner_command(runner)
-    if runner_command:
+    availability_err = ensure_runner_available(runner=runner, runner_policy=runner_policy, command=runner_command)
+    if availability_err:
         payload = {
-            "phase": "epic_create_agentic",
-            "runner": runner,
-            "research_depth": research_depth,
-            "epic_name": args.name.strip(),
-            "brief_sections": sections,
-            "decomposition_nodes": nodes,
-            "current_answers": answers,
+            "status": "error",
+            "phase": "runner_resolution",
+            "error": availability_err,
+            "pending_questions": 0,
+            "artifact_paths": {},
         }
-        normalized, err = invoke_runner(runner_command, payload, root)
-        if err:
-            print(f"[WARN] Runner mediation failed; using local synthesis fallback: {err}")
-        elif normalized is not None:
-            nodes = _merge_runner_nodes(nodes, normalized.get("decomposition_nodes", []))
-            findings = _merge_runner_findings(findings, normalized.get("research_findings", []))
-            questions = merge_questions(questions, normalized.get("questions", []))
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print(f"[ERROR] {availability_err}")
+        return 1
+
+    phase_history: list[dict[str, Any]] = []
+    last_runner_meta: dict[str, Any] = {}
+    if runner_command:
+        for phase_name in ["adaptive_decomposition", "research", "question_loop"]:
+            for attempt in range(1, depth_behavior.max_phase_iterations + 1):
+                payload = {
+                    "phase": phase_name,
+                    "attempt": attempt,
+                    "runner": runner,
+                    "research_depth": research_depth,
+                    "research_behavior": {
+                        "reasoning_effort": depth_behavior.reasoning_effort,
+                        "web_search": depth_behavior.web_search,
+                        "max_phase_iterations": depth_behavior.max_phase_iterations,
+                    },
+                    "codex_surface": codex_surface,
+                    "codex_profile": codex_profile,
+                    "epic_name": args.name.strip(),
+                    "brief_sections": sections,
+                    "decomposition_nodes": nodes,
+                    "research_findings": findings,
+                    "questions": [
+                        {
+                            "question_id": q.question_id,
+                            "text": q.text,
+                            "required": q.required,
+                            "source": q.source,
+                        }
+                        for q in questions
+                    ],
+                    "current_answers": answers,
+                }
+                normalized, meta, err = invoke_runner_adapter(
+                    runner=runner,
+                    command=runner_command,
+                    payload=payload,
+                    root=root,
+                    phase=phase_name,
+                )
+                phase_entry = {
+                    "phase": phase_name,
+                    "attempt": attempt,
+                    "runner": runner,
+                    "status": "ok",
+                }
+                last_runner_meta = {
+                    "provider": meta.provider,
+                    "events_count": meta.events_count,
+                    "session_id": meta.session_id,
+                    "thread_id": meta.thread_id,
+                    "resumed_from_thread_id": meta.resumed_from_thread_id,
+                    "phase": meta.phase,
+                }
+                if err:
+                    phase_entry["status"] = "error"
+                    phase_entry["error"] = err
+                    phase_history.append(phase_entry)
+                    if runner_policy == "strict":
+                        if getattr(args, "json", False):
+                            print(
+                                json.dumps(
+                                    {
+                                        "status": "error",
+                                        "phase": phase_name,
+                                        "error": err,
+                                        "pending_questions": 0,
+                                        "artifact_paths": {},
+                                        "phase_history": phase_history,
+                                    },
+                                    indent=2,
+                                    sort_keys=True,
+                                )
+                            )
+                        else:
+                            print(f"[ERROR] Runner mediation failed in strict mode during '{phase_name}': {err}")
+                        return 1
+                    break
+
+                if normalized is None:
+                    phase_entry["status"] = "noop"
+                    phase_history.append(phase_entry)
+                    break
+
+                before = (len(nodes), len(findings), len(questions))
+                nodes = _merge_runner_nodes(nodes, normalized.get("decomposition_nodes", []))
+                findings = _merge_runner_findings(findings, normalized.get("research_findings", []))
+                questions = merge_questions(questions, normalized.get("questions", []))
+                after = (len(nodes), len(findings), len(questions))
+                phase_entry["nodes"] = {"before": before[0], "after": after[0]}
+                phase_entry["findings"] = {"before": before[1], "after": after[1]}
+                phase_entry["questions"] = {"before": before[2], "after": after[2]}
+                phase_history.append(phase_entry)
+                if before == after:
+                    break
 
     answers, pending_questions = resolve_questions(questions=questions, seed_answers=answers, interactive=interactive)
     if pending_questions:
         question_pack_path = _question_pack_path(root, args)
         write_question_pack(question_pack_path, epic_name=args.name.strip(), questions=pending_questions, answers=answers)
-        print(f"[NEEDS_INPUT] Required answers missing; wrote question pack to {question_pack_path}")
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "needs_input",
+                        "phase": "question_loop",
+                        "pending_questions": len(pending_questions),
+                        "question_pack": str(question_pack_path),
+                        "artifact_paths": {"question_pack": str(question_pack_path)},
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(f"[NEEDS_INPUT] Required answers missing; wrote question pack to {question_pack_path}")
         return NEEDS_INPUT_EXIT_CODE
 
     approval_mode = (getattr(args, "approval_mode", "two-gate") or "two-gate").strip().lower()
+    approval_ledger: list[dict[str, Any]] = []
     if approval_mode in {"two-gate", "per-feature"}:
         approved, answers = ask_approval_gate(
             gate_id="A-AGENTIC-DECOMPOSITION",
@@ -371,9 +490,32 @@ def _run_agentic(args) -> int:
             interactive=interactive,
             seed_answers=answers,
         )
+        approval_ledger.append(
+            {
+                "gate_id": "A-AGENTIC-DECOMPOSITION",
+                "scope": "epic",
+                "answer": answers.get("A-AGENTIC-DECOMPOSITION", ""),
+                "approved": bool(approved),
+            }
+        )
         if not approved:
             if answers.get("A-AGENTIC-DECOMPOSITION", "").strip():
-                print("[ERROR] Decomposition approval rejected.")
+                if getattr(args, "json", False):
+                    print(
+                        json.dumps(
+                            {
+                                "status": "error",
+                                "phase": "approval_decomposition",
+                                "error": "Decomposition approval rejected.",
+                                "pending_questions": 0,
+                                "artifact_paths": {},
+                            },
+                            indent=2,
+                            sort_keys=True,
+                        )
+                    )
+                else:
+                    print("[ERROR] Decomposition approval rejected.")
                 return 1
             question_pack_path = _question_pack_path(root, args)
             write_question_pack(
@@ -389,7 +531,22 @@ def _run_agentic(args) -> int:
                 ],
                 answers=answers,
             )
-            print(f"[NEEDS_INPUT] Missing decomposition approval; wrote question pack to {question_pack_path}")
+            if getattr(args, "json", False):
+                print(
+                    json.dumps(
+                        {
+                            "status": "needs_input",
+                            "phase": "approval_decomposition",
+                            "pending_questions": 1,
+                            "question_pack": str(question_pack_path),
+                            "artifact_paths": {"question_pack": str(question_pack_path)},
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(f"[NEEDS_INPUT] Missing decomposition approval; wrote question pack to {question_pack_path}")
             return NEEDS_INPUT_EXIT_CODE
 
     create_result = _build_agentic_feature_tree(
@@ -431,12 +588,51 @@ def _run_agentic(args) -> int:
         if pending_commit:
             question_pack_path = _question_pack_path(root, args)
             write_question_pack(question_pack_path, epic_name=args.name.strip(), questions=pending_commit, answers=answers)
-            print(f"[NEEDS_INPUT] Missing approval answers; wrote question pack to {question_pack_path}")
+            if getattr(args, "json", False):
+                print(
+                    json.dumps(
+                        {
+                            "status": "needs_input",
+                            "phase": "approval_commit",
+                            "pending_questions": len(pending_commit),
+                            "question_pack": str(question_pack_path),
+                            "artifact_paths": {"question_pack": str(question_pack_path)},
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(f"[NEEDS_INPUT] Missing approval answers; wrote question pack to {question_pack_path}")
             return NEEDS_INPUT_EXIT_CODE
         for question in commit_prompts:
             value = answers.get(question.question_id, "").strip().lower()
+            approved = value in {"y", "yes", "approved", "true", "1"}
+            approval_ledger.append(
+                {
+                    "gate_id": question.question_id,
+                    "scope": "feature" if question.question_id.startswith("A-AGENTIC-COMMIT-") else "epic",
+                    "answer": answers.get(question.question_id, ""),
+                    "approved": approved,
+                }
+            )
             if value not in {"y", "yes", "approved", "true", "1"}:
-                print(f"[ERROR] Approval rejected for {question.question_id}")
+                if getattr(args, "json", False):
+                    print(
+                        json.dumps(
+                            {
+                                "status": "error",
+                                "phase": "approval_commit",
+                                "error": f"Approval rejected for {question.question_id}",
+                                "pending_questions": 0,
+                                "artifact_paths": {},
+                            },
+                            indent=2,
+                            sort_keys=True,
+                        )
+                    )
+                else:
+                    print(f"[ERROR] Approval rejected for {question.question_id}")
                 return 1
 
     epic_slug = f"{epic_id}-{slugify(args.name)}"
@@ -451,11 +647,11 @@ def _run_agentic(args) -> int:
     )
 
     working_rows.sort(key=lambda row: row.feature_id)
-    write_feature_rows(features_path, working_rows, version="2.3.0")
+    write_feature_rows(features_path, working_rows, version="2.4.0")
 
     epic_rows.append(epic_row)
     epic_rows.sort(key=lambda row: row.epic_id)
-    write_epic_rows(epics_path, epic_rows, version="2.3.0")
+    write_epic_rows(epics_path, epic_rows, version="2.4.0")
 
     for row in created_rows:
         feature_dir = (docs / row.spec_path).parent
@@ -518,6 +714,7 @@ def _run_agentic(args) -> int:
         "children": _children_view(nodes, temp_to_feature_id),
         "generated_components": sorted({node.get("node_type", "capability") for node in nodes if node.get("node_type")}),
         "generation_run_id": f"GEN-{now_timestamp()}",
+        "phase_history": phase_history,
     }
     dump_json_document(epic_dir / "decomposition.yaml", decomposition_payload)
 
@@ -565,12 +762,21 @@ def _run_agentic(args) -> int:
             "mode": approval_mode,
             "decomposition": answers.get("A-AGENTIC-DECOMPOSITION", "yes"),
             "commit": answers.get("A-AGENTIC-COMMIT", "yes"),
+            "ledger": approval_ledger,
         },
         "synthesis_quality_profile": {
             "minimums": AGENTIC_QUALITY_MINIMUMS,
             "research_log": "research.md",
             "requires_no_tbd_evidence": True,
             "research_depth": research_depth,
+            "reasoning_effort": depth_behavior.reasoning_effort,
+            "web_search": depth_behavior.web_search,
+            "max_phase_iterations": depth_behavior.max_phase_iterations,
+        },
+        "codex": {
+            "surface": codex_surface,
+            "profile": codex_profile,
+            "runner_policy": runner_policy,
         },
     }
     if runner_command:
@@ -591,6 +797,12 @@ def _run_agentic(args) -> int:
             "generated_at": now_timestamp(),
             "question_count": len(questions),
             "scope_feature_count": len(scope_feature_ids),
+            "runner_policy": runner_policy,
+            "codex_surface": codex_surface,
+            "codex_profile": codex_profile,
+            "phase_history": phase_history,
+            "runner_meta": last_runner_meta,
+            "approval_ledger": approval_ledger,
         },
     )
 
@@ -610,12 +822,54 @@ def _run_agentic(args) -> int:
     render_stats = collect_traceability_stats(docs, working_rows)
     render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
     if render_rc != 0:
-        print("[ERROR] Failed to render project docs after epic creation.")
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "phase": "commit",
+                        "error": "Failed to render project docs after epic creation.",
+                        "pending_questions": 0,
+                        "artifact_paths": {},
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("[ERROR] Failed to render project docs after epic creation.")
         return 1
 
-    print(f"Created agentic epic {epic_id} at {epic_dir}")
-    print(f"Created {len(created_rows)} features in scope rooted at {root_row_preview.feature_id}")
-    print("Epic status set to planning. Run oneshot to transition to implementing.")
+    artifact_paths = {
+        "epic_dir": str(epic_dir),
+        "brief": str(epic_dir / "brief.md"),
+        "decomposition": str(epic_dir / "decomposition.yaml"),
+        "oneshot": str(epic_dir / "oneshot.yaml"),
+        "research": str(epic_dir / "research.md"),
+        "questions": str(epic_dir / "questions.yaml"),
+        "answers": str(epic_dir / "answers.yaml"),
+        "agentic_state": str(epic_dir / "agentic_state.json"),
+    }
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "phase": "commit",
+                    "epic_id": epic_id,
+                    "runner": runner,
+                    "runner_policy": runner_policy,
+                    "pending_questions": 0,
+                    "artifact_paths": artifact_paths,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"Created agentic epic {epic_id} at {epic_dir}")
+        print(f"Created {len(created_rows)} features in scope rooted at {root_row_preview.feature_id}")
+        print("Epic status set to planning. Run oneshot to transition to implementing.")
     return 0
 
 
@@ -631,7 +885,25 @@ def _merge_runner_nodes(base_nodes: list[dict[str, Any]], candidate_nodes: list[
         return base_nodes
 
     if not base_nodes:
-        return base_nodes
+        out: list[dict[str, Any]] = []
+        for idx, node in enumerate(candidate_nodes, start=1):
+            if not isinstance(node, dict):
+                continue
+            name = str(node.get("name", "")).strip()
+            if not name:
+                continue
+            out.append(
+                {
+                    "temp_id": str(node.get("temp_id", f"N-RUNNER-{idx:03d}")).strip() or f"N-RUNNER-{idx:03d}",
+                    "parent_temp_id": str(node.get("parent_temp_id", "N-ROOT")).strip() or "N-ROOT",
+                    "name": name,
+                    "node_type": str(node.get("node_type", "capability")),
+                    "rationale": str(node.get("rationale", "Runner-provided decomposition rationale.")),
+                    "confidence": float(node.get("confidence", 0.7)),
+                    "source_refs": node.get("source_refs", []),
+                }
+            )
+        return out
 
     root = base_nodes[0]
     merged: list[dict[str, Any]] = list(base_nodes)

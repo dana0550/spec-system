@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
+import json
 from pathlib import Path
 
 from specctl.agentic_epic import (
@@ -19,6 +20,7 @@ from specctl.epic_index import read_epic_rows
 from specctl.feature_index import read_feature_rows, write_feature_rows
 from specctl.io_utils import now_date, set_frontmatter_value, write_text
 from specctl.oneshot_utils import collect_traceability_stats, dump_json_document, load_json_document
+from specctl.runner_adapter import default_runner_policy, validate_codex_surface
 
 
 def run(args) -> int:
@@ -43,6 +45,9 @@ def run(args) -> int:
         return 1
     dry_run = check_mode or not apply_mode
     runner = args.runner or "codex"
+    codex_surface = validate_codex_surface(getattr(args, "codex_surface", "auto"))
+    codex_profile = (getattr(args, "codex_profile", "spec-agentic") or "spec-agentic").strip()
+    runner_policy = default_runner_policy("agentic", runner, getattr(args, "runner_policy", None))
     interactive = is_interactive_mode(bool(getattr(args, "interactive", False)), bool(getattr(args, "no_interactive", False)))
     answers_file = Path(args.answers_file).resolve() if getattr(args, "answers_file", None) else None
     provided_answers = load_answers_file(answers_file)
@@ -61,6 +66,7 @@ def run(args) -> int:
     findings = collect_repo_findings(root)
     upgrades: list[tuple[str, str, list[str]]] = []
     updated_feature_ids: set[str] = set()
+    migrated_epics: list[str] = []
 
     for epic in epics:
         epic_dir = docs / epic.epic_path
@@ -73,31 +79,36 @@ def run(args) -> int:
         scope = payload.get("scope_feature_ids", [])
         if not isinstance(scope, list):
             scope = []
+        epic_had_upgrade = False
 
-        default_answers = {
-            "Q-AGENTIC-001": f"Backfilled KPI baseline for {epic.name}",
-            "Q-AGENTIC-002": "Backfilled constraints from existing brief and steering docs",
-        }
-        effective_answers = dict(default_answers)
-        effective_answers.update(provided_answers)
-        if question_mode_enabled:
-            questions = [
-                AgenticQuestion(
-                    question_id="Q-AGENTIC-001",
-                    text=f"What KPI should be prioritized for migrated epic '{epic.name}'?",
-                    required=True,
-                    source="migration",
-                ),
-                AgenticQuestion(
-                    question_id="Q-AGENTIC-002",
-                    text=f"Any additional migration constraints for epic '{epic.name}'?",
-                    required=True,
-                    source="migration",
-                ),
-            ]
+        questions = [
+            AgenticQuestion(
+                question_id="Q-AGENTIC-001",
+                text=f"What KPI should be prioritized for migrated epic '{epic.name}'?",
+                required=True,
+                source="migration",
+            ),
+            AgenticQuestion(
+                question_id="Q-AGENTIC-002",
+                text=f"Any additional migration constraints for epic '{epic.name}'?",
+                required=True,
+                source="migration",
+            ),
+        ]
+
+        if runner_policy == "strict":
+            effective_answers = dict(provided_answers)
+        else:
+            effective_answers = {
+                "Q-AGENTIC-001": f"Backfilled KPI baseline for {epic.name}",
+                "Q-AGENTIC-002": "Backfilled constraints from existing brief and steering docs",
+            }
+            effective_answers.update(provided_answers)
+
+        if runner_policy == "strict" or question_mode_enabled:
             resolved_answers, pending = resolve_questions(
                 questions=questions,
-                seed_answers=dict(provided_answers),
+                seed_answers=dict(effective_answers),
                 interactive=interactive,
             )
             if pending:
@@ -107,10 +118,25 @@ def run(args) -> int:
                     questions=pending,
                     answers=resolved_answers,
                 )
-                print(
-                    f"[NEEDS_INPUT] Missing required migration answers for {epic.epic_id}; "
-                    f"wrote question pack to {question_pack_path}"
-                )
+                if getattr(args, "json", False):
+                    print(
+                        json.dumps(
+                            {
+                                "status": "needs_input",
+                                "phase": "migration_questions",
+                                "epic_id": epic.epic_id,
+                                "pending_questions": len(pending),
+                                "artifact_paths": {"question_pack": str(question_pack_path)},
+                            },
+                            indent=2,
+                            sort_keys=True,
+                        )
+                    )
+                else:
+                    print(
+                        f"[NEEDS_INPUT] Missing required migration answers for {epic.epic_id}; "
+                        f"wrote question pack to {question_pack_path}"
+                    )
                 return NEEDS_INPUT_EXIT_CODE
             effective_answers.update(resolved_answers)
 
@@ -123,6 +149,7 @@ def run(args) -> int:
             if not issues:
                 continue
             upgrades.append((epic.epic_id, feature_id, issues))
+            epic_had_upgrade = True
             if dry_run:
                 continue
 
@@ -139,6 +166,9 @@ def run(args) -> int:
                 path = feature_dir / filename
                 write_text(path, text)
             updated_feature_ids.add(feature_id)
+
+        if epic_had_upgrade:
+            migrated_epics.append(epic.epic_id)
 
         if dry_run:
             continue
@@ -158,11 +188,29 @@ def run(args) -> int:
             profile.setdefault("research_log", "research.md")
             profile.setdefault("requires_no_tbd_evidence", True)
             profile.setdefault("migration_runner", runner)
+            profile.setdefault("migration_runner_policy", runner_policy)
 
         payload.setdefault("approval_gates", {})
         if isinstance(payload["approval_gates"], dict):
             payload["approval_gates"].setdefault("mode", "migration")
             payload["approval_gates"].setdefault("migration_date", now_date())
+            payload["approval_gates"].setdefault(
+                "ledger",
+                [
+                    {
+                        "gate_id": "A-MIGRATE-INPUTS",
+                        "scope": "epic",
+                        "approved": True,
+                        "answer": "migration-inputs-resolved",
+                    }
+                ],
+            )
+
+        payload.setdefault("codex", {})
+        if isinstance(payload["codex"], dict):
+            payload["codex"].setdefault("surface", codex_surface)
+            payload["codex"].setdefault("profile", codex_profile)
+            payload["codex"].setdefault("runner_policy", runner_policy)
 
         dump_json_document(oneshot_path, payload)
 
@@ -193,27 +241,80 @@ def run(args) -> int:
                     "{\n"
                     f'  "epic_id": "{epic.epic_id}",\n'
                     f'  "runner": "{runner}",\n'
+                    f'  "runner_policy": "{runner_policy}",\n'
+                    f'  "codex_surface": "{codex_surface}",\n'
+                    f'  "codex_profile": "{codex_profile}",\n'
                     '  "status": "migration_backfilled"\n'
                     "}\n",
                     encoding="utf-8",
+                )
+            elif aux == "answers.yaml":
+                dump_json_document(path, effective_answers)
+            elif aux == "questions.yaml":
+                dump_json_document(
+                    path,
+                    {
+                        "questions": [
+                            {
+                                "question_id": q.question_id,
+                                "text": q.text,
+                                "required": q.required,
+                                "source": q.source,
+                            }
+                            for q in questions
+                        ]
+                    },
                 )
             else:
                 path.write_text("{}\n", encoding="utf-8")
 
     if upgrades:
-        print("Agentic migration findings:")
-        for epic_id, feature_id, issues in upgrades:
-            issue_text = "; ".join(issues)
-            print(f"- {epic_id} / {feature_id}: {issue_text}")
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "upgrades_found",
+                        "phase": "scan",
+                        "upgrades": [
+                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                            for epic_id, feature_id, issues in upgrades
+                        ],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("Agentic migration findings:")
+            for epic_id, feature_id, issues in upgrades:
+                issue_text = "; ".join(issues)
+                print(f"- {epic_id} / {feature_id}: {issue_text}")
     else:
-        print("No migration upgrades required.")
+        if not getattr(args, "json", False):
+            print("No migration upgrades required.")
 
     if dry_run:
-        print("Dry-run mode enabled (default). Re-run with --apply to write changes.")
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "dry_run",
+                        "phase": "scan",
+                        "upgrades_count": len(upgrades),
+                        "runner_policy": runner_policy,
+                        "pending_questions": 0,
+                        "artifact_paths": {},
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("Dry-run mode enabled (default). Re-run with --apply to write changes.")
         return 1 if upgrades else 0
 
     if updated_feature_ids:
-        write_feature_rows(features_path, feature_rows, version="2.3.0")
+        write_feature_rows(features_path, feature_rows, version="2.4.0")
         for feature_id in updated_feature_ids:
             row = feature_by_id.get(feature_id)
             if not row:
@@ -227,8 +328,40 @@ def run(args) -> int:
     render_stats = collect_traceability_stats(docs, feature_rows)
     render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
     if render_rc != 0:
-        print("[ERROR] Failed to render docs after migration apply")
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "phase": "apply",
+                        "error": "Failed to render docs after migration apply",
+                        "artifact_paths": {},
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("[ERROR] Failed to render docs after migration apply")
         return 1
 
-    print("Agentic migration apply completed.")
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "phase": "apply",
+                    "runner": runner,
+                    "runner_policy": runner_policy,
+                    "epics_scanned": [epic.epic_id for epic in epics],
+                    "epics_with_upgrades": sorted(set(migrated_epics)),
+                    "upgrades_count": len(upgrades),
+                    "artifact_paths": {},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print("Agentic migration apply completed.")
     return 0

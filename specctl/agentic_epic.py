@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-import os
 import re
 import shlex
 import subprocess
@@ -15,6 +14,7 @@ import yaml
 from specctl.constants import AGENTIC_DESIGN_REQUIRED_SECTIONS, AGENTIC_QUALITY_MINIMUMS
 from specctl.io_utils import now_date, now_timestamp, read_text, write_text
 from specctl.models import FeatureRow
+from specctl.runner_adapter import resolve_runner_command as resolve_runner_command_impl
 
 
 @dataclass
@@ -26,10 +26,7 @@ class AgenticQuestion:
 
 
 def resolve_runner_command(runner: str) -> str:
-    by_runner = os.environ.get(f"SPECCTL_AGENTIC_RUNNER_COMMAND_{runner.upper()}", "").strip()
-    if by_runner:
-        return by_runner
-    return os.environ.get("SPECCTL_AGENTIC_RUNNER_COMMAND", "").strip()
+    return resolve_runner_command_impl(runner)
 
 
 def load_answers_file(path: Path | None) -> dict[str, str]:
@@ -270,6 +267,7 @@ def parse_runner_json(output: str) -> tuple[dict[str, Any] | None, str | None]:
         "decomposition_nodes": payload.get("decomposition_nodes", []),
         "research_findings": payload.get("research_findings", []),
         "questions": payload.get("questions", []),
+        "feature_synthesis": payload.get("feature_synthesis", []),
     }
     if not isinstance(normalized["decomposition_nodes"], list):
         normalized["decomposition_nodes"] = []
@@ -277,6 +275,8 @@ def parse_runner_json(output: str) -> tuple[dict[str, Any] | None, str | None]:
         normalized["research_findings"] = []
     if not isinstance(normalized["questions"], list):
         normalized["questions"] = []
+    if not isinstance(normalized["feature_synthesis"], list):
+        normalized["feature_synthesis"] = []
     return normalized, None
 
 

@@ -224,28 +224,34 @@ This allows resume continuity without relying on full transcript replay.
 
 ## Agent setup (Codex and Claude)
 ### Codex
-1. Install Codex CLI and authenticate.
-2. Add repository instructions in `AGENTS.md`.
-3. Optionally install the local skill package:
+1. Install Codex app/CLI and authenticate.
+2. Run Codex compatibility scaffolding:
+
+```bash
+specctl codex setup --root .
+specctl codex check --root .
+```
+
+3. In the Codex app, open project Settings:
+- set profile to `spec-agentic` (or `spec-ci` for automation/CI-style runs)
+- map Local Environment setup script to `scripts/codex/worktree-setup.sh`
+- optionally add `scripts/codex/project-actions.sh` as a quick command
+4. Optionally install the local skill package:
 
 ```bash
 install-skill-from-github.py --repo dana0550/spec-system --path skills/docs-spec-system
 ```
 
-Suggested `AGENTS.md` seed:
-
-```md
-Use $docs-spec-system and specctl to run the v2 phase-gated workflow
-(requirements -> design -> tasks -> verification) with EARS+RFC requirements,
-Gherkin scenarios, and full traceability.
-```
-
 Official references:
 
+- <https://developers.openai.com/codex/app>
+- <https://developers.openai.com/codex/app/settings>
+- <https://developers.openai.com/codex/app/local-environments>
+- <https://developers.openai.com/codex/app/worktrees>
 - <https://developers.openai.com/codex/guides/agents-md>
 - <https://developers.openai.com/codex/noninteractive>
 - <https://developers.openai.com/codex/cli/reference>
-- <https://developers.openai.com/blog/run-long-horizon-tasks-with-codex>
+- <https://developers.openai.com/codex/config-reference>
 
 ### Claude Code
 1. Install Claude Code and authenticate.
@@ -277,8 +283,31 @@ specctl feature check --feature-id F-###
 specctl impact scan [--feature-id F-###] [--json]
 specctl impact refresh [--feature-id F-###] [--ack-upstream]
 
-specctl epic create --name "..." --owner <owner> --brief ./brief.md
+specctl epic create --name "..." --owner <owner> --brief ./brief.md \
+  [--mode agentic|deterministic] \
+  [--runner codex|claude] \
+  [--codex-surface auto|app|cli|ci] \
+  [--codex-profile spec-agentic] \
+  [--runner-policy strict|fallback] \
+  [--interactive|--no-interactive] \
+  [--answers-file ./answers.yaml] \
+  [--question-pack-out ./pending.yaml] \
+  [--approval-mode two-gate|per-feature|none] \
+  [--research-depth deep|balanced|lean] \
+  [--json]
 specctl epic check --epic-id E-###
+specctl epic migrate-agentic [--epic-id E-###] [--check|--apply] \
+  [--runner codex|claude] \
+  [--codex-surface auto|app|cli|ci] \
+  [--codex-profile spec-agentic] \
+  [--runner-policy strict|fallback] \
+  [--interactive|--no-interactive] \
+  [--answers-file ./answers.yaml] \
+  [--question-pack-out ./pending.yaml] \
+  [--json]
+
+specctl codex setup [--force] [--json]
+specctl codex check [--json]
 
 specctl oneshot run --epic-id E-### [--runner codex|claude]
 specctl oneshot resume --epic-id E-### --run-id RUN-...

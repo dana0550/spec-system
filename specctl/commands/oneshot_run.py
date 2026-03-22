@@ -42,7 +42,7 @@ def run(args) -> int:
                 row.status = "implementing"
                 updated = True
         if updated:
-            write_epic_rows(epics_path, epic_rows, version="2.3.0")
+            write_epic_rows(epics_path, epic_rows, version="2.4.0")
             epic.status = "implementing"
 
     state = {

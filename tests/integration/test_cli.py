@@ -771,6 +771,8 @@ def test_epic_create_agentic_noninteractive_requires_question_pack(tmp_path: Pat
             "owner@example.com",
             "--brief",
             str(brief_path),
+            "--runner-policy",
+            "fallback",
             "--no-interactive",
             "--question-pack-out",
             str(question_pack),
@@ -819,6 +821,8 @@ def test_epic_create_agentic_with_answers_writes_planning_epic(tmp_path: Path) -
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--runner-policy",
+                "fallback",
                 "--no-interactive",
                 "--answers-file",
                 str(answers),
@@ -887,6 +891,8 @@ def test_oneshot_run_transitions_planning_epic_to_implementing(tmp_path: Path) -
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--runner-policy",
+                "fallback",
                 "--no-interactive",
                 "--answers-file",
                 str(answers),
@@ -972,7 +978,6 @@ def test_epic_migrate_agentic_check_and_apply(tmp_path: Path) -> None:
         == 0
     )
 
-    assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--check"]) == 1
     assert (
         main(
             [
@@ -983,13 +988,44 @@ def test_epic_migrate_agentic_check_and_apply(tmp_path: Path) -> None:
                 "--epic-id",
                 "E-001",
                 "--check",
-                "--apply",
+                "--runner-policy",
+                "fallback",
             ]
         )
         == 1
     )
-    assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--apply"]) == 0
-    assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--apply"]) == 0
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 0
+    )
 
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
     assert (epic_dir / "research.md").exists()
@@ -1110,6 +1146,241 @@ def test_epic_migrate_agentic_emits_question_pack_when_required_answers_missing(
     question_ids = {row["question_id"] for row in payload["questions"]}
     assert "Q-AGENTIC-001" in question_ids
     assert "Q-AGENTIC-002" in question_ids
+
+
+def test_epic_create_agentic_strict_requires_runner_command(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticStrictRunner",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--no-interactive",
+        ]
+    )
+    assert rc == 1
+    assert "| E-001 |" not in (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+
+
+def test_epic_create_agentic_json_needs_input_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    question_pack = root / "pending.json.yaml"
+    _write_epic_brief(brief_path, include_ui=True)
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticJsonNeedsInput",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(question_pack),
+            "--json",
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    stdout = capsys.readouterr().out
+    payload = json.loads(stdout[stdout.find("{") : stdout.rfind("}") + 1])
+    assert payload["status"] == "needs_input"
+    assert payload["phase"] == "question_loop"
+    assert payload["artifact_paths"]["question_pack"] == str(question_pack)
+
+
+def test_codex_setup_and_check_commands(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+
+    assert main(["codex", "setup", "--root", str(root)]) == 0
+    assert (root / "AGENTS.md").exists()
+    assert (root / ".codex" / "config.toml").exists()
+    assert (root / "scripts" / "codex" / "worktree-setup.sh").exists()
+    assert (root / "scripts" / "codex" / "project-actions.sh").exists()
+    assert (root / "assets" / "codex" / "automations" / "spec-quality-check.md").exists()
+    assert (root / "assets" / "codex" / "automations" / "migration-audit.md").exists()
+    assert main(["codex", "check", "--root", str(root)]) == 0
+
+
+def test_codex_check_detects_missing_assets(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["codex", "check", "--root", str(root)]) == 1
+
+
+def test_epic_create_agentic_per_feature_approval_ledger(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answer_lines = [
+        "Q-AGENTIC-001: Improve activation conversion",
+        "Q-AGENTIC-002: SOC2 controls apply",
+        "A-AGENTIC-DECOMPOSITION: yes",
+    ]
+    for idx in range(1, 50):
+        answer_lines.append(f"A-AGENTIC-COMMIT-{idx:03d}: yes")
+    answers.write_text("\n".join(answer_lines) + "\n", encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "PerFeatureLedger",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--runner-policy",
+                "fallback",
+                "--approval-mode",
+                "per-feature",
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    ledger = oneshot_payload["approval_gates"]["ledger"]
+    assert ledger
+    assert any(item["gate_id"].startswith("A-AGENTIC-COMMIT-") for item in ledger)
+
+
+def test_epic_create_agentic_json_success_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve activation conversion",
+                "Q-AGENTIC-002: SOC2 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticJsonSuccess",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--answers-file",
+            str(answers),
+            "--json",
+        ]
+    )
+    assert rc == 0
+    stdout = capsys.readouterr().out
+    payload = json.loads(stdout[stdout.find("{") : stdout.rfind("}") + 1])
+    assert payload["status"] == "ok"
+    assert payload["phase"] == "commit"
+    assert Path(payload["artifact_paths"]["oneshot"]).exists()
+
+
+def test_epic_create_agentic_multiple_question_pack_paths_do_not_conflict(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+
+    brief_a = root / "epic-a.md"
+    brief_b = root / "epic-b.md"
+    _write_epic_brief(brief_a, include_ui=True)
+    _write_epic_brief(brief_b, include_ui=True)
+    pack_a = root / "packs" / "pack-a.yaml"
+    pack_b = root / "packs" / "pack-b.yaml"
+
+    rc_a = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticPackA",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_a),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(pack_a),
+        ]
+    )
+    rc_b = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticPackB",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_b),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(pack_b),
+        ]
+    )
+    assert rc_a == NEEDS_INPUT_EXIT_CODE
+    assert rc_b == NEEDS_INPUT_EXIT_CODE
+    assert pack_a.exists()
+    assert pack_b.exists()
+    assert "epic_name: AgenticPackA" in pack_a.read_text(encoding="utf-8")
+    assert "epic_name: AgenticPackB" in pack_b.read_text(encoding="utf-8")
+
 
 def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
