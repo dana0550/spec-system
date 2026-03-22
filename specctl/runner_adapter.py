@@ -60,6 +60,16 @@ def validate_codex_surface(surface: str) -> str:
     return normalized
 
 
+def build_codex_exec_command(*, codex_surface: str, codex_profile: str) -> str:
+    surface = validate_codex_surface(codex_surface)
+    parts = ["codex", "exec", "--json", "-o"]
+    if codex_profile:
+        parts.extend(["--profile", codex_profile])
+    if surface == "ci":
+        parts.extend(["--no-interactive"])
+    return " ".join(parts)
+
+
 def resolve_runner_command(
     runner: str,
     *,
