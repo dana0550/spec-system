@@ -253,6 +253,14 @@ Official references:
 - <https://developers.openai.com/codex/cli/reference>
 - <https://developers.openai.com/codex/config-reference>
 
+Runner command resolution for `specctl epic create --mode agentic --runner codex`:
+
+1. `SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX`
+2. `SPECCTL_AGENTIC_RUNNER_COMMAND`
+3. Auto command from flags: `codex exec --json -o --profile <codex-profile>` (adds `--no-interactive` when `--codex-surface ci`)
+
+`--codex-surface` and `--codex-profile` affect both metadata artifacts and the actual runner command invocation.
+
 ### Claude Code
 1. Install Claude Code and authenticate.
 2. Add repository instructions in `CLAUDE.md`.
@@ -322,6 +330,10 @@ specctl approve --feature-id F-### --phase requirements|design|tasks
 specctl migrate-v1-to-v2
 specctl report [--json]
 ```
+
+JSON contract note:
+
+- `specctl epic create --mode agentic --json` and `specctl epic migrate-agentic --json` each emit exactly one JSON object per invocation.
 
 ### Impact baseline workflow
 - `specctl impact scan` detects direct (`added|changed|removed`) and propagated (`upstream_changed`) suspects.

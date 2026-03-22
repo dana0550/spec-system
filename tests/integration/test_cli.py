@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
@@ -1148,12 +1149,117 @@ def test_epic_migrate_agentic_emits_question_pack_when_required_answers_missing(
     assert "Q-AGENTIC-002" in question_ids
 
 
-def test_epic_create_agentic_strict_requires_runner_command(tmp_path: Path) -> None:
+def test_epic_migrate_agentic_json_output_is_single_object(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrateJsonSingleObject",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+    answers = root / "migration-answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Reliability KPI",
+                "Q-AGENTIC-002: Migration constraints",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    capsys.readouterr()
+    rc = main(
+        [
+            "epic",
+            "migrate-agentic",
+            "--root",
+            str(root),
+            "--epic-id",
+            "E-001",
+            "--apply",
+            "--runner-policy",
+            "strict",
+            "--no-interactive",
+            "--answers-file",
+            str(answers),
+            "--json",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["phase"] == "apply"
+    assert payload["runner_policy"] == "strict"
+    assert payload["epics_scanned"] == ["E-001"]
+    assert isinstance(payload["upgrades"], list)
+
+
+def test_epic_create_agentic_strict_auto_resolves_codex_command(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
     brief_path = root / "epic-brief.md"
     _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve conversion",
+                "Q-AGENTIC-002: SOC2 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX", raising=False)
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND", raising=False)
+    captured_commands: list[str] = []
+
+    def invoke_stub(*, runner: str, command: str, payload: dict, root: Path, phase: str):
+        del payload, root
+        captured_commands.append(command)
+        return (
+            {
+                "decomposition_nodes": [],
+                "research_findings": [],
+                "questions": [],
+                "feature_synthesis": [],
+            },
+            SimpleNamespace(
+                provider=runner,
+                command=command,
+                phase=phase,
+                events_count=1,
+                session_id="se_test",
+                thread_id="th_test",
+                resumed_from_thread_id="",
+            ),
+            None,
+        )
+
+    monkeypatch.setattr(epic_create_command, "invoke_runner_adapter", invoke_stub)
 
     rc = main(
         [
@@ -1167,11 +1273,22 @@ def test_epic_create_agentic_strict_requires_runner_command(tmp_path: Path) -> N
             "owner@example.com",
             "--brief",
             str(brief_path),
+            "--codex-surface",
+            "ci",
+            "--codex-profile",
+            "spec-ci",
             "--no-interactive",
+            "--answers-file",
+            str(answers),
         ]
     )
-    assert rc == 1
-    assert "| E-001 |" not in (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert rc == 0
+    expected = "codex exec --json -o --profile spec-ci --no-interactive"
+    assert captured_commands
+    assert all(command == expected for command in captured_commands)
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot["runner_command"] == expected
 
 
 def test_epic_create_agentic_json_needs_input_payload(tmp_path: Path, capsys) -> None:
@@ -1181,6 +1298,7 @@ def test_epic_create_agentic_json_needs_input_payload(tmp_path: Path, capsys) ->
     brief_path = root / "epic-brief.md"
     question_pack = root / "pending.json.yaml"
     _write_epic_brief(brief_path, include_ui=True)
+    capsys.readouterr()
 
     rc = main(
         [
@@ -1203,8 +1321,7 @@ def test_epic_create_agentic_json_needs_input_payload(tmp_path: Path, capsys) ->
         ]
     )
     assert rc == NEEDS_INPUT_EXIT_CODE
-    stdout = capsys.readouterr().out
-    payload = json.loads(stdout[stdout.find("{") : stdout.rfind("}") + 1])
+    payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "needs_input"
     assert payload["phase"] == "question_loop"
     assert payload["artifact_paths"]["question_pack"] == str(question_pack)
@@ -1228,6 +1345,36 @@ def test_codex_check_detects_missing_assets(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["codex", "check", "--root", str(root)]) == 1
+
+
+def test_codex_check_fails_for_malformed_config(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["codex", "setup", "--root", str(root)]) == 0
+    capsys.readouterr()
+    (root / ".codex" / "config.toml").write_text("[profiles.spec-agentic\nmodel = 'gpt-5.4'\n", encoding="utf-8")
+
+    rc = main(["codex", "check", "--root", str(root), "--json"])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert any("parse error" in item for item in payload["missing"])
+
+
+def test_codex_check_fails_when_required_profile_key_missing(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["codex", "setup", "--root", str(root)]) == 0
+    capsys.readouterr()
+    config = root / ".codex" / "config.toml"
+    config_text = config.read_text(encoding="utf-8")
+    config.write_text(config_text.replace('web_search = "cached"', ""), encoding="utf-8")
+
+    rc = main(["codex", "check", "--root", str(root), "--json"])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert any("web_search" in item for item in payload["missing"])
 
 
 def test_epic_create_agentic_per_feature_approval_ledger(tmp_path: Path) -> None:
@@ -1296,6 +1443,7 @@ def test_epic_create_agentic_json_success_payload(tmp_path: Path, capsys) -> Non
         ),
         encoding="utf-8",
     )
+    capsys.readouterr()
     rc = main(
         [
             "epic",
@@ -1317,8 +1465,7 @@ def test_epic_create_agentic_json_success_payload(tmp_path: Path, capsys) -> Non
         ]
     )
     assert rc == 0
-    stdout = capsys.readouterr().out
-    payload = json.loads(stdout[stdout.find("{") : stdout.rfind("}") + 1])
+    payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ok"
     assert payload["phase"] == "commit"
     assert Path(payload["artifact_paths"]["oneshot"]).exists()

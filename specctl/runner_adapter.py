@@ -60,11 +60,26 @@ def validate_codex_surface(surface: str) -> str:
     return normalized
 
 
-def resolve_runner_command(runner: str) -> str:
-    by_runner = os.environ.get(f"SPECCTL_AGENTIC_RUNNER_COMMAND_{runner.upper()}", "").strip()
+def resolve_runner_command(
+    runner: str,
+    *,
+    codex_surface: str = "auto",
+    codex_profile: str = "spec-agentic",
+) -> str:
+    normalized_runner = (runner or "").strip().lower()
+    by_runner = os.environ.get(
+        f"SPECCTL_AGENTIC_RUNNER_COMMAND_{normalized_runner.upper()}",
+        "",
+    ).strip()
     if by_runner:
         return by_runner
-    return os.environ.get("SPECCTL_AGENTIC_RUNNER_COMMAND", "").strip()
+    global_override = os.environ.get("SPECCTL_AGENTIC_RUNNER_COMMAND", "").strip()
+    if global_override:
+        return global_override
+    if normalized_runner == "codex":
+        profile = (codex_profile or "spec-agentic").strip()
+        return build_codex_exec_command(codex_surface=codex_surface, codex_profile=profile)
+    return ""
 
 
 def ensure_runner_available(*, runner: str, runner_policy: str, command: str) -> str | None:

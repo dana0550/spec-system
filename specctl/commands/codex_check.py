@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised in py3.10 only
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 REQUIRED_FILES = [
@@ -12,6 +18,9 @@ REQUIRED_FILES = [
     "assets/codex/automations/spec-quality-check.md",
     "assets/codex/automations/migration-audit.md",
 ]
+
+REQUIRED_PROFILE_NAMES = ["spec-agentic", "spec-ci", "spec-review"]
+REQUIRED_PROFILE_KEYS = ["model", "model_reasoning_effort", "sandbox_mode", "approval_policy", "web_search"]
 
 
 def run(args) -> int:
@@ -32,13 +41,7 @@ def run(args) -> int:
 
     config_path = root / ".codex" / "config.toml"
     if config_path.exists():
-        text = config_path.read_text(encoding="utf-8")
-        for section in ["[profiles.spec-agentic]", "[profiles.spec-ci]", "[profiles.spec-review]"]:
-            if section not in text:
-                missing.append(f".codex/config.toml section {section}")
-        for key in ["sandbox_mode", "approval_policy", "web_search"]:
-            if key not in text:
-                warnings.append(f".codex/config.toml missing key '{key}'")
+        _validate_config_file(config_path, missing)
 
     payload = {
         "status": "ok" if not missing else "error",
@@ -62,3 +65,34 @@ def run(args) -> int:
                 print(f"- {item}")
 
     return 1 if missing else 0
+
+
+def _validate_config_file(path: Path, missing: list[str]) -> None:
+    raw = path.read_bytes()
+    try:
+        data = tomllib.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        missing.append(f".codex/config.toml must be UTF-8 encoded ({exc})")
+        return
+    except Exception as exc:  # tomllib and tomli raise parser-specific decode errors
+        missing.append(f".codex/config.toml parse error: {exc}")
+        return
+
+    profiles = data.get("profiles")
+    if not isinstance(profiles, dict):
+        missing.append(".codex/config.toml missing table [profiles]")
+        return
+
+    for profile_name in REQUIRED_PROFILE_NAMES:
+        profile = profiles.get(profile_name)
+        if not isinstance(profile, dict):
+            missing.append(f".codex/config.toml missing table [profiles.{profile_name}]")
+            continue
+        _validate_profile(profile, profile_name, missing)
+
+
+def _validate_profile(profile: dict[str, Any], profile_name: str, missing: list[str]) -> None:
+    for key in REQUIRED_PROFILE_KEYS:
+        value = profile.get(key)
+        if not isinstance(value, str) or not value.strip():
+            missing.append(f".codex/config.toml [profiles.{profile_name}] missing non-empty '{key}'")

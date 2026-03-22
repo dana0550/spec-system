@@ -23,8 +23,17 @@ class AgenticQuestion:
     source: str = "system"
 
 
-def resolve_runner_command(runner: str) -> str:
-    return resolve_runner_command_impl(runner)
+def resolve_runner_command(
+    runner: str,
+    *,
+    codex_surface: str = "auto",
+    codex_profile: str = "spec-agentic",
+) -> str:
+    return resolve_runner_command_impl(
+        runner,
+        codex_surface=codex_surface,
+        codex_profile=codex_profile,
+    )
 
 
 def load_answers_file(path: Path | None) -> dict[str, str]:

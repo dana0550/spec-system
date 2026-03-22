@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from contextlib import redirect_stdout
+from io import StringIO
 import json
 from pathlib import Path
 from typing import Any
@@ -263,7 +265,11 @@ def _run_deterministic(args) -> int:
     write_text(epic_dir / "memory" / "open_threads.md", "# Open Threads\n\n- None\n")
 
     render_stats = collect_traceability_stats(docs, working_rows)
-    render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
+    if getattr(args, "json", False):
+        with redirect_stdout(StringIO()):
+            render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
+    else:
+        render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
     if render_rc != 0:
         print("[ERROR] Failed to render project docs after epic creation.")
         return 1
@@ -348,7 +354,11 @@ def _run_agentic(args) -> int:
 
     questions = default_questions(args.name.strip(), sections)
 
-    runner_command = resolve_runner_command(runner)
+    runner_command = resolve_runner_command(
+        runner,
+        codex_surface=codex_surface,
+        codex_profile=codex_profile,
+    )
     availability_err = ensure_runner_available(runner=runner, runner_policy=runner_policy, command=runner_command)
     if availability_err:
         payload = {
@@ -820,7 +830,11 @@ def _run_agentic(args) -> int:
     write_text(epic_dir / "memory" / "open_threads.md", "# Open Threads\n\n- None\n")
 
     render_stats = collect_traceability_stats(docs, working_rows)
-    render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
+    if getattr(args, "json", False):
+        with redirect_stdout(StringIO()):
+            render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
+    else:
+        render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
     if render_rc != 0:
         if getattr(args, "json", False):
             print(

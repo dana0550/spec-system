@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from contextlib import redirect_stdout
+from io import StringIO
 import json
 from pathlib import Path
 
@@ -35,13 +37,61 @@ def run(args) -> int:
     if args.epic_id:
         epics = [epic for epic in epics if epic.epic_id == args.epic_id]
         if not epics:
-            print(f"[ERROR] Epic ID not found: {args.epic_id}")
+            if getattr(args, "json", False):
+                print(
+                    json.dumps(
+                        {
+                            "status": "error",
+                            "phase": "scan",
+                            "runner": args.runner or "codex",
+                            "runner_policy": default_runner_policy(
+                                "agentic",
+                                args.runner or "codex",
+                                getattr(args, "runner_policy", None),
+                            ),
+                            "epics_scanned": [],
+                            "epics_with_upgrades": [],
+                            "upgrades_count": 0,
+                            "pending_questions": 0,
+                            "artifact_paths": {},
+                            "error": f"Epic ID not found: {args.epic_id}",
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(f"[ERROR] Epic ID not found: {args.epic_id}")
             return 1
 
     check_mode = bool(getattr(args, "check", False))
     apply_mode = bool(getattr(args, "apply", False))
     if check_mode and apply_mode:
-        print("[ERROR] --check and --apply are mutually exclusive")
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "phase": "scan",
+                        "runner": args.runner or "codex",
+                        "runner_policy": default_runner_policy(
+                            "agentic",
+                            args.runner or "codex",
+                            getattr(args, "runner_policy", None),
+                        ),
+                        "epics_scanned": [epic.epic_id for epic in epics],
+                        "epics_with_upgrades": [],
+                        "upgrades_count": 0,
+                        "pending_questions": 0,
+                        "artifact_paths": {},
+                        "error": "--check and --apply are mutually exclusive",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("[ERROR] --check and --apply are mutually exclusive")
         return 1
     dry_run = check_mode or not apply_mode
     runner = args.runner or "codex"
@@ -51,6 +101,7 @@ def run(args) -> int:
     interactive = is_interactive_mode(bool(getattr(args, "interactive", False)), bool(getattr(args, "no_interactive", False)))
     answers_file = Path(args.answers_file).resolve() if getattr(args, "answers_file", None) else None
     provided_answers = load_answers_file(answers_file)
+    epics_scanned = [epic.epic_id for epic in epics]
     question_pack_path = (
         Path(args.question_pack_out).resolve()
         if getattr(args, "question_pack_out", None)
@@ -124,8 +175,16 @@ def run(args) -> int:
                             {
                                 "status": "needs_input",
                                 "phase": "migration_questions",
-                                "epic_id": epic.epic_id,
+                                "runner": runner,
+                                "runner_policy": runner_policy,
+                                "epics_scanned": epics_scanned,
+                                "epics_with_upgrades": sorted(set(migrated_epics)),
+                                "upgrades_count": len(upgrades),
                                 "pending_questions": len(pending),
+                                "upgrades": [
+                                    {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                                    for epic_id, feature_id, issues in upgrades
+                                ],
                                 "artifact_paths": {"question_pack": str(question_pack_path)},
                             },
                             indent=2,
@@ -268,29 +327,13 @@ def run(args) -> int:
             else:
                 path.write_text("{}\n", encoding="utf-8")
 
-    if upgrades:
-        if getattr(args, "json", False):
-            print(
-                json.dumps(
-                    {
-                        "status": "upgrades_found",
-                        "phase": "scan",
-                        "upgrades": [
-                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
-                            for epic_id, feature_id, issues in upgrades
-                        ],
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-        else:
+    if not getattr(args, "json", False):
+        if upgrades:
             print("Agentic migration findings:")
             for epic_id, feature_id, issues in upgrades:
                 issue_text = "; ".join(issues)
                 print(f"- {epic_id} / {feature_id}: {issue_text}")
-    else:
-        if not getattr(args, "json", False):
+        else:
             print("No migration upgrades required.")
 
     if dry_run:
@@ -300,9 +343,16 @@ def run(args) -> int:
                     {
                         "status": "dry_run",
                         "phase": "scan",
+                        "runner": runner,
                         "upgrades_count": len(upgrades),
                         "runner_policy": runner_policy,
+                        "epics_scanned": epics_scanned,
+                        "epics_with_upgrades": sorted(set(migrated_epics)),
                         "pending_questions": 0,
+                        "upgrades": [
+                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                            for epic_id, feature_id, issues in upgrades
+                        ],
                         "artifact_paths": {},
                     },
                     indent=2,
@@ -326,7 +376,11 @@ def run(args) -> int:
                     set_frontmatter_value(path, "status", row.status)
 
     render_stats = collect_traceability_stats(docs, feature_rows)
-    render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
+    if getattr(args, "json", False):
+        with redirect_stdout(StringIO()):
+            render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
+    else:
+        render_rc = render.run(Namespace(root=str(root), check=False, stats=render_stats))
     if render_rc != 0:
         if getattr(args, "json", False):
             print(
@@ -334,6 +388,16 @@ def run(args) -> int:
                     {
                         "status": "error",
                         "phase": "apply",
+                        "runner": runner,
+                        "runner_policy": runner_policy,
+                        "epics_scanned": epics_scanned,
+                        "epics_with_upgrades": sorted(set(migrated_epics)),
+                        "upgrades_count": len(upgrades),
+                        "pending_questions": 0,
+                        "upgrades": [
+                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                            for epic_id, feature_id, issues in upgrades
+                        ],
                         "error": "Failed to render docs after migration apply",
                         "artifact_paths": {},
                     },
@@ -353,9 +417,14 @@ def run(args) -> int:
                     "phase": "apply",
                     "runner": runner,
                     "runner_policy": runner_policy,
-                    "epics_scanned": [epic.epic_id for epic in epics],
+                    "epics_scanned": epics_scanned,
                     "epics_with_upgrades": sorted(set(migrated_epics)),
                     "upgrades_count": len(upgrades),
+                    "pending_questions": 0,
+                    "upgrades": [
+                        {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                        for epic_id, feature_id, issues in upgrades
+                    ],
                     "artifact_paths": {},
                 },
                 indent=2,

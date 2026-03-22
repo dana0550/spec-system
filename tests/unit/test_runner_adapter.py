@@ -4,9 +4,11 @@ import json
 
 from specctl.runner_adapter import (
     behavior_for_depth,
+    build_codex_exec_command,
     default_runner_policy,
     parse_codex_jsonl_output,
     parse_runner_json,
+    resolve_runner_command,
 )
 
 
@@ -31,6 +33,27 @@ def test_default_runner_policy_prefers_strict_for_agentic_codex() -> None:
     assert default_runner_policy("agentic", "codex", "fallback") == "fallback"
 
 
+def test_build_codex_exec_command_uses_profile_and_surface() -> None:
+    assert build_codex_exec_command(codex_surface="auto", codex_profile="spec-agentic") == "codex exec --json -o --profile spec-agentic"
+    assert "--no-interactive" in build_codex_exec_command(codex_surface="ci", codex_profile="spec-ci")
+
+
+def test_resolve_runner_command_precedence(monkeypatch) -> None:
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX", raising=False)
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND", raising=False)
+    assert resolve_runner_command("codex", codex_surface="ci", codex_profile="spec-ci") == (
+        "codex exec --json -o --profile spec-ci --no-interactive"
+    )
+
+    monkeypatch.setenv("SPECCTL_AGENTIC_RUNNER_COMMAND", "global-runner")
+    assert resolve_runner_command("codex", codex_surface="ci", codex_profile="spec-ci") == "global-runner"
+
+    monkeypatch.setenv("SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX", "runner-specific")
+    assert resolve_runner_command("codex", codex_surface="ci", codex_profile="spec-ci") == "runner-specific"
+
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX", raising=False)
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND", raising=False)
+    assert resolve_runner_command("claude", codex_surface="ci", codex_profile="spec-ci") == ""
 def test_parse_codex_jsonl_output_extracts_runner_payload_and_state() -> None:
     payload = {
         "decomposition_nodes": [{"temp_id": "N-ROOT", "name": "Root"}],
@@ -63,6 +86,59 @@ def test_parse_codex_jsonl_output_extracts_runner_payload_and_state() -> None:
     assert normalized["decomposition_nodes"][0]["temp_id"] == "N-ROOT"
     assert meta.thread_id == "th_123"
     assert meta.session_id == "se_123"
+
+
+def test_parse_codex_jsonl_output_handles_variant_event_shapes_and_noise() -> None:
+    payload = {
+        "decomposition_nodes": [{"temp_id": "N-ALT", "name": "AltRoot"}],
+        "research_findings": [{"finding_id": "FIND-ALT-001", "summary": "Alt Summary"}],
+        "questions": [{"question_id": "Q-ALT-001", "text": "Alt Question"}],
+        "feature_synthesis": [],
+    }
+    output = "\n".join(
+        [
+            "non-json line",
+            json.dumps({"type": "thread.started", "threadId": "th_camel", "sessionId": "se_camel"}),
+            json.dumps({"type": "thread.message", "data": {"item": {"response": {"output_text": json.dumps(payload)}}}}),
+            json.dumps({"type": "thread.message", "thread": {"id": "th_nested"}, "session": {"id": "se_nested"}}),
+        ]
+    )
+
+    normalized, meta, err = parse_codex_jsonl_output(output)
+    assert err is None
+    assert normalized is not None
+    assert normalized["decomposition_nodes"][0]["temp_id"] == "N-ALT"
+    assert meta.thread_id == "th_nested"
+    assert meta.session_id == "se_nested"
+    assert meta.events_count == 4
+
+
+def test_parse_codex_jsonl_output_uses_last_valid_payload_from_mixed_stream() -> None:
+    first = {
+        "decomposition_nodes": [{"temp_id": "N-OLD", "name": "Old"}],
+        "research_findings": [],
+        "questions": [],
+        "feature_synthesis": [],
+    }
+    last = {
+        "decomposition_nodes": [{"temp_id": "N-NEW", "name": "New"}],
+        "research_findings": [{"finding_id": "FIND-NEW-001", "summary": "Newest"}],
+        "questions": [],
+        "feature_synthesis": [],
+    }
+    output = "\n".join(
+        [
+            json.dumps({"type": "thread.message", "message": {"content": [{"type": "output_text", "text": json.dumps(first)}]}}),
+            json.dumps({"type": "thread.message", "message": {"content": [{"type": "output_text", "text": "not-json"}]}}),
+            json.dumps({"type": "thread.message", "message": {"content": [{"type": "output_text", "text": json.dumps(last)}]}}),
+            "trailing noise",
+        ]
+    )
+    normalized, _, err = parse_codex_jsonl_output(output)
+    assert err is None
+    assert normalized is not None
+    assert normalized["decomposition_nodes"][0]["temp_id"] == "N-NEW"
+    assert normalized["research_findings"][0]["finding_id"] == "FIND-NEW-001"
 
 
 def test_parity_normalization_between_json_and_codex_jsonl() -> None:
