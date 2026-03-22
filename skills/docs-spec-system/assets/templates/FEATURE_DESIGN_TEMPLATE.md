@@ -8,15 +8,13 @@ last_updated: <yyyy-mm-dd>
 
 ## Architecture
 
-## Interfaces / Contracts
+## Contracts and Data
 
-## Data Model
+## UX Behavior
 
-## Error Handling
+## Observability
 
-## Security / Privacy
-
-## Testing Strategy
+## Risks and Tradeoffs
 
 ## Requirement Mapping
-- D-FXXX-001: Implements R-FXXX-001
+- R-FXXX-001 -> D-FXXX-001

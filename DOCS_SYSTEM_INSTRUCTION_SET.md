@@ -1,8 +1,8 @@
 ---
 doc_type: notice
 name: docs_system_instruction_set_deprecated
-version: 2.1.0
-last_updated: 2026-03-02
+version: 2.4.0
+last_updated: 2026-03-21
 ---
 # Docs System Instruction Set (Deprecated)
 
@@ -14,6 +14,6 @@ Use the Spec System v2 interfaces instead:
 - Rules: `skills/docs-spec-system/references/spec-system-rules.md`
 - Workflows: `skills/docs-spec-system/references/workflows.md`
 - Release/PR flow: `skills/docs-spec-system/references/release-and-pr.md`
-- CLI: `specctl` (`init`, `feature create`, `impact scan`, `impact refresh`, `lint`, `render`, `check`, `approve`, `migrate-v1-to-v2`, `report`)
+- CLI: `specctl` (`init`, `feature create`, `feature check`, `epic create`, `epic check`, `epic migrate-agentic`, `codex setup`, `codex check`, `oneshot run`, `oneshot resume`, `oneshot check`, `oneshot finalize`, `oneshot report`, `impact scan`, `impact refresh`, `lint`, `render`, `check`, `approve`, `migrate-v1-to-v2`, `report`)
 
 Legacy script-driven interfaces are unsupported.
