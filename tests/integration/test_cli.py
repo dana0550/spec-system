@@ -973,6 +973,21 @@ def test_epic_migrate_agentic_check_and_apply(tmp_path: Path) -> None:
     )
 
     assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--check"]) == 1
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--check",
+                "--apply",
+            ]
+        )
+        == 1
+    )
     assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--apply"]) == 0
     assert main(["epic", "migrate-agentic", "--root", str(root), "--epic-id", "E-001", "--apply"]) == 0
 

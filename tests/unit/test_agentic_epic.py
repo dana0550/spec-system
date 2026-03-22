@@ -44,6 +44,70 @@ def test_synthesized_feature_meets_quality_baseline(tmp_path: Path) -> None:
     assert issues == []
 
 
+def test_quality_validator_accepts_three_digit_child_segments(tmp_path: Path) -> None:
+    feature_dir = tmp_path / "features" / "F-001.100-nested"
+    feature_dir.mkdir(parents=True)
+    (feature_dir / "requirements.md").write_text(
+        "\n".join(
+            [
+                "- R-F001.100-001: WHEN valid the system MUST work.",
+                "- R-F001.100-002: IF failed the system MUST recover.",
+                "- R-F001.100-003: WHILE running the system SHOULD log.",
+                "- S-F001.100-001: Given valid When submitted Then success.",
+                "- S-F001.100-002: Given invalid When submitted Then failure.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (feature_dir / "design.md").write_text(
+        "\n".join(
+            [
+                "## Architecture",
+                "- D-F001.100-001: maps R-F001.100-001",
+                "## Contracts and Data",
+                "- D-F001.100-002: maps R-F001.100-002",
+                "## UX Behavior",
+                "- state transitions",
+                "## Observability",
+                "- logs",
+                "## Risks and Tradeoffs",
+                "- latency",
+                "## Requirement Mapping",
+                "- R-F001.100-001 -> D-F001.100-001",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (feature_dir / "tasks.md").write_text(
+        "\n".join(
+            [
+                "- [ ] T-F001.100-001 do one",
+                "- [ ] T-F001.100-002 do two",
+                "- [ ] T-F001.100-003 do three",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (feature_dir / "verification.md").write_text(
+        "\n".join(
+            [
+                "- S-F001.100-001: Given valid When submitted Then success.",
+                "Evidence: S-F001.100-001 -> planned:test/s-f001.100-001",
+                "- S-F001.100-002: Given invalid When submitted Then failure.",
+                "Evidence: S-F001.100-002 -> planned:test/s-f001.100-002",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    issues = validate_feature_quality(feature_dir)
+    assert issues == []
+
+
 def test_quality_validator_flags_tbd_evidence(tmp_path: Path) -> None:
     feature_dir = tmp_path / "features" / "F-001-bad"
     feature_dir.mkdir(parents=True)

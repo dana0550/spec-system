@@ -565,9 +565,9 @@ def count_requirements(requirements_text: str) -> tuple[int, int]:
     req_count = 0
     scenario_count = 0
     for line in requirements_text.splitlines():
-        if re.match(r"^\s*[-*]\s*R-F\d{3}(?:\.\d{2})*-\d{3}\s*:", line):
+        if re.match(r"^\s*[-*]\s*R-F\d{3}(?:\.\d{2,})*-\d{3}\s*:", line):
             req_count += 1
-        if re.match(r"^\s*[-*]\s*S-F\d{3}(?:\.\d{2})*-\d{3}\s*:", line):
+        if re.match(r"^\s*[-*]\s*S-F\d{3}(?:\.\d{2,})*-\d{3}\s*:", line):
             scenario_count += 1
     return req_count, scenario_count
 
@@ -575,7 +575,7 @@ def count_requirements(requirements_text: str) -> tuple[int, int]:
 def count_design_decisions(design_text: str) -> int:
     count = 0
     for line in design_text.splitlines():
-        if re.match(r"^\s*[-*]\s*D-F\d{3}(?:\.\d{2})*-\d{3}\s*:", line):
+        if re.match(r"^\s*[-*]\s*D-F\d{3}(?:\.\d{2,})*-\d{3}\s*:", line):
             count += 1
     return count
 
@@ -583,7 +583,7 @@ def count_design_decisions(design_text: str) -> int:
 def count_tasks(tasks_text: str) -> int:
     count = 0
     for line in tasks_text.splitlines():
-        if re.match(r"^\s*[-*]\s*\[[ xX]\]\s*T-F\d{3}(?:\.\d{2})*-\d{3}\b", line):
+        if re.match(r"^\s*[-*]\s*\[[ xX]\]\s*T-F\d{3}(?:\.\d{2,})*-\d{3}\b", line):
             count += 1
     return count
 

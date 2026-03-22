@@ -36,7 +36,12 @@ def run(args) -> int:
             print(f"[ERROR] Epic ID not found: {args.epic_id}")
             return 1
 
-    dry_run = not bool(args.apply)
+    check_mode = bool(getattr(args, "check", False))
+    apply_mode = bool(getattr(args, "apply", False))
+    if check_mode and apply_mode:
+        print("[ERROR] --check and --apply are mutually exclusive")
+        return 1
+    dry_run = check_mode or not apply_mode
     runner = args.runner or "codex"
     interactive = is_interactive_mode(bool(getattr(args, "interactive", False)), bool(getattr(args, "no_interactive", False)))
     answers_file = Path(args.answers_file).resolve() if getattr(args, "answers_file", None) else None
