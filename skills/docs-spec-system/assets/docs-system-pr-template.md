@@ -1,6 +1,6 @@
 ---
-name: Docs System PR (v2.1)
-about: Track spec-system v2.1 changes with traceability, epic one-shot, and phase evidence
+name: Docs System PR (v2.4)
+about: Track spec-system v2.4 changes with traceability, epic planning/one-shot, impact, and phase evidence
 title: "docs: <concise change summary> [E/F-XXX,…]"
 ---
 
@@ -38,6 +38,7 @@ title: "docs: <concise change summary> [E/F-XXX,…]"
 - [ ] `specctl lint`
 - [ ] `specctl render --check`
 - [ ] `specctl check`
+- [ ] `specctl codex check` (if Codex assets/config are present)
 - [ ] `specctl epic check --epic-id <E-ID>` (if epic changed)
 - [ ] `specctl oneshot check --epic-id <E-ID>` (if epic changed)
 - [ ] `specctl oneshot finalize --epic-id <E-ID> --run-id <RUN-ID>` (if epic run finalized)

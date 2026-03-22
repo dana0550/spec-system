@@ -53,3 +53,22 @@ REQUIRED_DOC_FILES = {
 }
 
 ONESHOT_PLACEHOLDER_PREFIX = "ONESHOT-BLOCKER:"
+
+# Exit code used when user input is required to continue an agentic workflow.
+NEEDS_INPUT_EXIT_CODE = 2
+
+AGENTIC_QUALITY_MINIMUMS = {
+    "requirements": 3,
+    "scenarios": 2,
+    "design_decisions": 2,
+    "tasks": 3,
+}
+
+AGENTIC_DESIGN_REQUIRED_SECTIONS = [
+    "Architecture",
+    "Contracts and Data",
+    "UX Behavior",
+    "Observability",
+    "Risks and Tradeoffs",
+    "Requirement Mapping",
+]

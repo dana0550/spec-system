@@ -4,14 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docs-spec-system"
-version = "2.2.0"
+version = "2.4.0"
 description = "Spec System v2 CLI and skill package"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "docs-spec-system" }]
 keywords = ["spec", "documentation", "llm", "requirements", "traceability"]
-dependencies = ["PyYAML>=6.0"]
+dependencies = [
+  "PyYAML>=6.0",
+  "tomli>=2.0.1; python_version < \"3.11\"",
+]
 
 [project.scripts]
 specctl = "specctl.cli:main"

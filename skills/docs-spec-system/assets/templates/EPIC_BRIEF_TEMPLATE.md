@@ -4,7 +4,7 @@ epic_id: E-XXX
 name: <Epic Name>
 root_feature_id: F-XXX
 owner: <owner>
-status: implementing
+status: planning
 last_updated: <yyyy-mm-dd>
 ---
 # Epic Brief

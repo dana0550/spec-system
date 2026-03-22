@@ -8,3 +8,4 @@ last_updated: <yyyy-mm-dd>
 
 - [ ] T-FXXX-001 Implement core behavior (R: R-FXXX-001, D: D-FXXX-001)
 - [ ] T-FXXX-002 Add tests and evidence linkage (R: R-FXXX-001, D: D-FXXX-001)
+- [ ] T-FXXX-003 Add observability and rollout guardrails (R: R-FXXX-002, D: D-FXXX-001)

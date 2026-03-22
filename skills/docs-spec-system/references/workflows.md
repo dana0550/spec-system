@@ -1,4 +1,4 @@
-# Workflows (v2.2)
+# Workflows (v2.4)
 
 All operations are phase-gated and validated with `specctl`.
 
@@ -21,7 +21,7 @@ Acceptance:
 2. Fill `requirements.md` with EARS+RFC statements and Gherkin scenarios.
 3. Add design mappings in `design.md`.
 4. Add implementation tasks in `tasks.md`.
-5. Add scenario evidence placeholders in `verification.md`.
+5. Add verification evidence plan in `verification.md`.
 6. Run `specctl impact scan`.
 7. Run `specctl check`.
 
@@ -29,9 +29,9 @@ Acceptance:
 
 - All IDs present and linked.
 - Traceability chain complete.
-- Impact suspects are either resolved or explicitly acknowledged.
+- Impact suspects are resolved or explicitly acknowledged.
 
-## 3) Add Epic (Automatic Feature Tree + One-Shot Contract)
+## 3) Add Epic (Agentic Default)
 
 1. Prepare brief with required sections:
    - `Vision`
@@ -40,20 +40,51 @@ Acceptance:
    - `Constraints`
    - `Non-Goals`
 2. Run `specctl epic create --name "<Epic>" --owner <owner> --brief <brief.md>`.
-3. Confirm epic scaffolding:
-   - root feature created
-   - child features generated from journeys/outcomes
-   - component leaf features generated per child
-   - one-shot artifacts created (`brief/decomposition/oneshot/memory/runs`)
-4. Run `specctl epic check --epic-id <E-ID>`.
-5. Run `specctl impact refresh`.
-6. Run `specctl check`.
+3. For non-interactive agentic runs, provide `--answers-file` or capture unresolved prompts via `--question-pack-out`.
+4. Confirm epic artifacts:
+   - `brief.md`
+   - `decomposition.yaml`
+   - `oneshot.yaml`
+   - `research.md`
+   - `questions.yaml`
+   - `answers.yaml`
+   - `agentic_state.json`
+5. Run `specctl epic check --epic-id <E-ID>`.
+6. Run `specctl impact refresh`.
+7. Run `specctl check`.
 
 Acceptance:
 
-- Epic tree is deterministic and linked in `FEATURES.md`.
+- Agentic epic create ends in `planning`.
+- Scoped features are generated in `tasks_draft`.
 - Epic one-shot contract is valid and checkpoint graph maps to `T-*`.
 - No blocking errors from `specctl check`.
+
+## 3b) Deterministic Epic Fallback
+
+1. Run `specctl epic create --mode deterministic --name "<Epic>" --owner <owner> --brief <brief.md>`.
+2. Validate with `specctl epic check --epic-id <E-ID>` and `specctl check`.
+
+Acceptance:
+
+- Existing deterministic scaffold behavior is preserved.
+- Deterministic epic create ends in `implementing`.
+
+## 3c) Migrate Existing Epics To Agentic Quality
+
+1. Dry run: `specctl epic migrate-agentic --check [--epic-id <E-ID>]`.
+2. If strict input policy is required, use:
+   - `--runner-policy strict`
+   - `--answers-file <path>` or `--question-pack-out <path>` for non-interactive runs.
+3. Apply: `specctl epic migrate-agentic --apply [--epic-id <E-ID>]`.
+4. Re-run `specctl impact refresh` and `specctl check`.
+
+Acceptance:
+
+- Upgraded features satisfy quality baselines.
+- Verification evidence does not contain `TBD`.
+- Agentic artifacts exist for migrated epics.
+- Re-running apply is idempotent.
 
 ## 4) Epic One-Shot Execution
 
@@ -67,6 +98,7 @@ Acceptance:
 
 Acceptance:
 
+- `oneshot run` transitions epic from `planning` to `implementing` when needed.
 - Run completes with zero open blockers.
 - No unresolved `ONESHOT-BLOCKER:*` markers remain.
 - No open impact suspects remain in finalize scope.
@@ -105,7 +137,7 @@ Acceptance:
 ## 7) Migration (v1 -> v2)
 
 1. Run `specctl migrate-v1-to-v2`.
-2. Review generated `docs/MIGRATION_REPORT.md`.
+2. Review `docs/MIGRATION_REPORT.md`.
 3. Run `specctl check`.
 4. Resolve blocking migration errors.
 

@@ -6,8 +6,11 @@ from specctl import __version__
 from specctl.commands import (
     approve,
     check,
+    codex_check,
+    codex_setup,
     epic_check,
     epic_create,
+    epic_migrate_agentic,
     feature_check,
     feature_create,
     impact_refresh,
@@ -26,7 +29,7 @@ from specctl.commands import (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="specctl", description="Spec System v2.2 CLI")
+    parser = argparse.ArgumentParser(prog="specctl", description="Spec System v2.4 CLI")
     parser.add_argument("--version", action="version", version=f"specctl {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -76,12 +79,61 @@ def build_parser() -> argparse.ArgumentParser:
     epic_create_parser.add_argument("--owner", default="unassigned")
     epic_create_parser.add_argument("--brief", required=True)
     epic_create_parser.add_argument("--feature-id")
+    epic_create_parser.add_argument("--mode", choices=["agentic", "deterministic"], default="agentic")
+    epic_create_parser.add_argument("--runner", choices=["codex", "claude"], default="codex")
+    epic_create_parser.add_argument("--codex-surface", choices=["auto", "app", "cli", "ci"], default="auto")
+    epic_create_parser.add_argument("--codex-profile", default="spec-agentic")
+    epic_create_parser.add_argument("--runner-policy", choices=["strict", "fallback"])
+    epic_create_parser.add_argument("--interactive", action="store_true")
+    epic_create_parser.add_argument("--no-interactive", action="store_true")
+    epic_create_parser.add_argument("--answers-file")
+    epic_create_parser.add_argument("--question-pack-out")
+    epic_create_parser.add_argument(
+        "--approval-mode",
+        choices=["two-gate", "per-feature", "none"],
+        default="two-gate",
+    )
+    epic_create_parser.add_argument("--research-depth", choices=["deep", "balanced", "lean"], default="deep")
+    epic_create_parser.add_argument("--json", action="store_true")
     epic_create_parser.set_defaults(func=epic_create.run)
 
     epic_check_parser = epic_sub.add_parser("check", help="Validate one epic and its one-shot artifacts")
     epic_check_parser.add_argument("--root", default=".")
     epic_check_parser.add_argument("--epic-id", required=True)
     epic_check_parser.set_defaults(func=epic_check.run)
+
+    epic_migrate_parser = epic_sub.add_parser(
+        "migrate-agentic",
+        help="Upgrade existing epic feature artifacts to agentic quality baseline",
+    )
+    epic_migrate_parser.add_argument("--root", default=".")
+    epic_migrate_parser.add_argument("--epic-id")
+    epic_migrate_parser.add_argument("--runner", choices=["codex", "claude"], default="codex")
+    epic_migrate_parser.add_argument("--codex-surface", choices=["auto", "app", "cli", "ci"], default="auto")
+    epic_migrate_parser.add_argument("--codex-profile", default="spec-agentic")
+    epic_migrate_parser.add_argument("--runner-policy", choices=["strict", "fallback"])
+    epic_migrate_parser.add_argument("--interactive", action="store_true")
+    epic_migrate_parser.add_argument("--no-interactive", action="store_true")
+    epic_migrate_parser.add_argument("--answers-file")
+    epic_migrate_parser.add_argument("--question-pack-out")
+    epic_migrate_parser.add_argument("--check", action="store_true")
+    epic_migrate_parser.add_argument("--apply", action="store_true")
+    epic_migrate_parser.add_argument("--json", action="store_true")
+    epic_migrate_parser.set_defaults(func=epic_migrate_agentic.run)
+
+    codex_parser = subparsers.add_parser("codex", help="Codex compatibility operations")
+    codex_sub = codex_parser.add_subparsers(dest="codex_command", required=True)
+
+    codex_setup_parser = codex_sub.add_parser("setup", help="Scaffold Codex app/CLI compatibility assets")
+    codex_setup_parser.add_argument("--root", default=".")
+    codex_setup_parser.add_argument("--force", action="store_true")
+    codex_setup_parser.add_argument("--json", action="store_true")
+    codex_setup_parser.set_defaults(func=codex_setup.run)
+
+    codex_check_parser = codex_sub.add_parser("check", help="Validate Codex compatibility assets and config")
+    codex_check_parser.add_argument("--root", default=".")
+    codex_check_parser.add_argument("--json", action="store_true")
+    codex_check_parser.set_defaults(func=codex_check.run)
 
     oneshot_parser = subparsers.add_parser("oneshot", help="One-shot epic execution commands")
     oneshot_sub = oneshot_parser.add_subparsers(dest="oneshot_command", required=True)

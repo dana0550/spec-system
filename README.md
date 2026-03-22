@@ -12,7 +12,7 @@
   <a href="https://github.com/dana0550/spec-system/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/dana0550/spec-system/ci.yml?branch=main&label=CI" alt="CI"></a>
   <a href="https://github.com/dana0550/spec-system/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/dana0550/spec-system/release.yml?label=Release" alt="Release"></a>
   <a href="https://github.com/dana0550/spec-system/releases"><img src="https://img.shields.io/github/v/release/dana0550/spec-system" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/specctl-v2.2.0-0E8A92" alt="specctl v2.2.0">
+  <img src="https://img.shields.io/badge/specctl-v2.4.0-0E8A92" alt="specctl v2.4.0">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
@@ -55,7 +55,7 @@ Most spec workflows fail on long horizon builds because planning, execution, and
 | Capability | What it does |
 |---|---|
 | `Feature` workflow | One-off feature delivery with phase-gated artifacts (`requirements`, `design`, `tasks`, `verification`). |
-| `Epic` workflow | Automatic feature-tree scaffolding from a required `brief.md`. |
+| `Epic` workflow | Agentic epic planning by default (research + questions + approvals + full spec synthesis) with deterministic fallback mode. |
 | One-shot runtime | Checkpointed build/validate/repair loop with blocker ledger and placeholder policy. |
 | Deterministic quality | Enforced IDs, traceability (`R -> D -> T -> S -> evidence`), and contract linting. |
 | Memory resilience | Resume-safe run artifacts for context compaction scenarios. |
@@ -63,7 +63,9 @@ Most spec workflows fail on long horizon builds because planning, execution, and
 
 ## Core model
 - `Feature`: isolated delivery unit.
-- `Epic`: orchestration unit that generates a root feature, child features, and component leaf features.
+- `Epic`: orchestration unit with two planning modes:
+  - `agentic` (default): adaptive decomposition + runner-mediated research/question loop + synthesis + approvals
+  - `deterministic`: fixed hierarchy scaffold from journeys/outcomes
 - `One-shot`: mandatory execution contract for epics with checkpoint graph + validation + blocker + finalize gates.
 
 ```mermaid
@@ -138,7 +140,7 @@ Minimal brief:
 - No redesign of external admin UI.
 ```
 
-### Create an epic (auto decomposition)
+### Create an epic (agentic default)
 ```bash
 specctl epic create \
   --name "Billing Reliability" \
@@ -146,16 +148,25 @@ specctl epic create \
   --brief ./brief.md
 ```
 
-Deterministic decomposition behavior:
+Default behavior (`--mode agentic`):
+
+- adaptive feature hierarchy generated from brief + repo context + runner mediation
+- required question loop with strict non-interactive `NEEDS_INPUT` handling (`exit 2`)
+- approval gates (`two-gate` by default; `per-feature` and `none` supported)
+- generated agentic artifacts in epic folder:
+  - `research.md`
+  - `questions.yaml`
+  - `answers.yaml`
+  - `agentic_state.json`
+- epic status after create: `planning`
+- generated feature statuses after create: `tasks_draft`
+
+Deterministic behavior (`--mode deterministic`) remains supported for compatibility:
 
 - each `User Journeys` bullet becomes a child feature
 - if no journeys exist, each `Outcomes` bullet becomes a child feature
-- each child gets component leaves:
-  - `Contract/API`
-  - `Domain/Data`
-  - `Execution/Integration`
-  - `Verification/Observability`
-- optional `UX/Client` is added when user-facing brief sections (`Vision`, `Outcomes`, `User Journeys`) include UI keywords (`ui`, `frontend`, `screen`, `workflow`, `form`, `dashboard`)
+- each child gets component leaves (`Contract/API`, `Domain/Data`, `Execution/Integration`, `Verification/Observability`, optional `UX/Client` when UI keywords exist)
+- deterministic epic status after create: `implementing`
 
 Minimal `oneshot.yaml` contract shape:
 
@@ -224,28 +235,43 @@ This allows resume continuity without relying on full transcript replay.
 
 ## Agent setup (Codex and Claude)
 ### Codex
-1. Install Codex CLI and authenticate.
-2. Add repository instructions in `AGENTS.md`.
-3. Optionally install the local skill package:
+1. Install Codex app/CLI and authenticate.
+2. Run Codex compatibility scaffolding:
+
+```bash
+specctl codex setup --root .
+specctl codex check --root .
+```
+
+3. In the Codex app, open project Settings:
+- set profile to `spec-agentic` (or `spec-ci` for automation/CI-style runs)
+- map Local Environment setup script to `scripts/codex/worktree-setup.sh`
+- optionally add `scripts/codex/project-actions.sh` as a quick command
+4. Optionally install the local skill package:
 
 ```bash
 install-skill-from-github.py --repo dana0550/spec-system --path skills/docs-spec-system
 ```
 
-Suggested `AGENTS.md` seed:
-
-```md
-Use $docs-spec-system and specctl to run the v2 phase-gated workflow
-(requirements -> design -> tasks -> verification) with EARS+RFC requirements,
-Gherkin scenarios, and full traceability.
-```
-
 Official references:
 
+- <https://developers.openai.com/codex/app>
+- <https://developers.openai.com/codex/app/settings>
+- <https://developers.openai.com/codex/app/local-environments>
+- <https://developers.openai.com/codex/app/worktrees>
 - <https://developers.openai.com/codex/guides/agents-md>
 - <https://developers.openai.com/codex/noninteractive>
 - <https://developers.openai.com/codex/cli/reference>
-- <https://developers.openai.com/blog/run-long-horizon-tasks-with-codex>
+- <https://developers.openai.com/codex/config-reference>
+
+Runner command resolution for `specctl epic create --mode agentic --runner codex`:
+
+1. `SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX`
+2. `SPECCTL_AGENTIC_RUNNER_COMMAND`
+3. Auto command from flags: `codex exec --json -o --profile <codex-profile>` (adds `--no-interactive` when `--codex-surface ci`)
+
+`--codex-surface` and `--codex-profile` affect both metadata artifacts and the actual runner command invocation.
+`specctl codex check` performs strict structural TOML validation of `.codex/config.toml` profiles and required keys.
 
 ### Claude Code
 1. Install Claude Code and authenticate.
@@ -277,8 +303,31 @@ specctl feature check --feature-id F-###
 specctl impact scan [--feature-id F-###] [--json]
 specctl impact refresh [--feature-id F-###] [--ack-upstream]
 
-specctl epic create --name "..." --owner <owner> --brief ./brief.md
+specctl epic create --name "..." --owner <owner> --brief ./brief.md \
+  [--mode agentic|deterministic] \
+  [--runner codex|claude] \
+  [--codex-surface auto|app|cli|ci] \
+  [--codex-profile spec-agentic] \
+  [--runner-policy strict|fallback] \
+  [--interactive|--no-interactive] \
+  [--answers-file ./answers.yaml] \
+  [--question-pack-out ./pending.yaml] \
+  [--approval-mode two-gate|per-feature|none] \
+  [--research-depth deep|balanced|lean] \
+  [--json]
 specctl epic check --epic-id E-###
+specctl epic migrate-agentic [--epic-id E-###] [--check|--apply] \
+  [--runner codex|claude] \
+  [--codex-surface auto|app|cli|ci] \
+  [--codex-profile spec-agentic] \
+  [--runner-policy strict|fallback] \
+  [--interactive|--no-interactive] \
+  [--answers-file ./answers.yaml] \
+  [--question-pack-out ./pending.yaml] \
+  [--json]
+
+specctl codex setup [--force] [--json]
+specctl codex check [--json]
 
 specctl oneshot run --epic-id E-### [--runner codex|claude]
 specctl oneshot resume --epic-id E-### --run-id RUN-...
@@ -293,6 +342,10 @@ specctl approve --feature-id F-### --phase requirements|design|tasks
 specctl migrate-v1-to-v2
 specctl report [--json]
 ```
+
+JSON contract note:
+
+- `specctl epic create --mode agentic --json` and `specctl epic migrate-agentic --json` each emit exactly one JSON object per invocation.
 
 ### Impact baseline workflow
 - `specctl impact scan` detects direct (`added|changed|removed`) and propagated (`upstream_changed`) suspects.
@@ -324,6 +377,10 @@ docs/
       brief.md
       decomposition.yaml
       oneshot.yaml
+      research.md
+      questions.yaml
+      answers.yaml
+      agentic_state.json
       memory/
       runs/
 ```
@@ -403,8 +460,8 @@ Manual tag flow from `main`:
 git fetch origin
 git switch main
 git pull --ff-only
-git tag -a v2.2.0 -m "docs-spec-system v2.2.0"
-git push origin v2.2.0
+git tag -a v2.4.0 -m "docs-spec-system v2.4.0"
+git push origin v2.4.0
 ```
 
 Automation in this repo:
@@ -423,6 +480,11 @@ specctl/
 tests/
 assets/readme/
 ```
+
+Documentation source of truth:
+
+- Repository markdown files are canonical.
+- No separate GitHub wiki repository is configured for this project.
 
 ## Development
 ```bash

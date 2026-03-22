@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import yaml
+
 from specctl.cli import main
 from specctl.validators.project import lint_project
 from specctl.validators.requirements import validate_requirements_file
@@ -146,3 +148,68 @@ def test_project_lint_runs_epic_validation_when_features_dir_missing(tmp_path: P
     codes = {message.code for message in messages}
     assert "FEATURES_DIR_MISSING" in codes
     assert "EPIC_ROOT_FEATURE_MISSING" in codes
+
+
+def test_agentic_profile_requires_research_log(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+
+    brief = root / "brief.md"
+    brief.write_text(
+        "\n".join(
+            [
+                "## Vision",
+                "- Improve reliability.",
+                "",
+                "## Outcomes",
+                "- Lower incidents.",
+                "",
+                "## User Journeys",
+                "- Operator applies policy.",
+                "",
+                "## Constraints",
+                "- Keep APIs stable.",
+                "",
+                "## Non-Goals",
+                "- No billing work.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "DeterministicForAgenticProfile",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_path = epic_dir / "oneshot.yaml"
+    payload = yaml.safe_load(oneshot_path.read_text(encoding="utf-8"))
+    payload["synthesis_quality_profile"] = {
+        "minimums": {"requirements": 3, "scenarios": 2, "design_decisions": 2, "tasks": 3},
+        "research_log": "research.md",
+        "requires_no_tbd_evidence": True,
+    }
+    oneshot_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+    research = epic_dir / "research.md"
+    if research.exists():
+        research.unlink()
+
+    messages, _, _ = lint_project(root)
+    assert any(message.code == "AGENTIC_RESEARCH_LOG_MISSING" for message in messages)

@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 
 from specctl.cli import main
+from specctl.commands import epic_create as epic_create_command
 from specctl.oneshot_utils import needs_ui_components
 from specctl.validators.project import lint_project
 
@@ -65,6 +66,8 @@ def test_oneshot_check_rejects_checkpoint_cycles(tmp_path: Path) -> None:
                 "owner@example.com",
                 "--brief",
                 str(brief),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -98,6 +101,8 @@ def test_oneshot_check_handles_non_list_scope_feature_ids(tmp_path: Path) -> Non
                 "owner@example.com",
                 "--brief",
                 str(brief),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -155,3 +160,43 @@ def test_ui_detection_scopes_workflow_keyword_to_user_facing_sections() -> None:
         ]
     )
     assert needs_ui_components(brief_user_journey) is True
+
+
+def test_merge_runner_nodes_preserves_local_nodes_and_appends_runner_nodes() -> None:
+    base_nodes = [
+        {
+            "temp_id": "N-ROOT",
+            "parent_temp_id": "",
+            "name": "Root",
+            "node_type": "epic_root",
+            "rationale": "root",
+            "confidence": 0.9,
+            "source_refs": ["FIND-BASE-001"],
+        },
+        {
+            "temp_id": "N-J001",
+            "parent_temp_id": "N-ROOT",
+            "name": "Journey Local",
+            "node_type": "journey",
+            "rationale": "local",
+            "confidence": 0.8,
+            "source_refs": ["FIND-BASE-001"],
+        },
+    ]
+    runner_nodes = [
+        {
+            "temp_id": "N-R001",
+            "parent_temp_id": "N-ROOT",
+            "name": "Runner Capability",
+            "node_type": "capability",
+            "rationale": "runner",
+            "confidence": 0.7,
+            "source_refs": ["FIND-RUNNER-001"],
+        }
+    ]
+
+    merged = epic_create_command._merge_runner_nodes(base_nodes, runner_nodes)
+    merged_ids = {node["temp_id"] for node in merged}
+    assert "N-J001" in merged_ids
+    assert "N-R001" in merged_ids
+    assert len(merged) == 3

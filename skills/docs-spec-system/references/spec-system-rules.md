@@ -1,6 +1,6 @@
-# Spec System Rules (v2.2)
+# Spec System Rules (v2.4)
 
-Release: `docs-spec-system` v2.2.0.
+Release: `docs-spec-system` v2.4.0.
 
 ## Canonical Model
 
@@ -15,6 +15,10 @@ Release: `docs-spec-system` v2.2.0.
   - `brief.md`
   - `decomposition.yaml`
   - `oneshot.yaml`
+  - `research.md` (agentic mode)
+  - `questions.yaml` (agentic mode)
+  - `answers.yaml` (agentic mode)
+  - `agentic_state.json` (agentic mode)
   - `memory/`
   - `runs/`
 - `docs/PRODUCT_MAP.md` and `docs/TRACEABILITY.md` are generated artifacts.
@@ -40,6 +44,10 @@ docs/
       brief.md
       decomposition.yaml
       oneshot.yaml
+      research.md
+      questions.yaml
+      answers.yaml
+      agentic_state.json
       memory/
       runs/
   features/
@@ -131,6 +139,11 @@ Global contract:
 Epic contract:
 
 - `brief -> decomposition -> oneshot contract -> run checkpoints -> blocker ledger -> finalize evidence`
+- Agentic epic create (`--mode agentic`) defaults to:
+  - epic status `planning`
+  - feature status `tasks_draft`
+  - strict non-interactive input enforcement (`NEEDS_INPUT_EXIT_CODE=2`) when required answers are missing
+- Deterministic epic create (`--mode deterministic`) remains backward-compatible and sets epic status `implementing`.
 - Epic one-shot finalize requires:
   - zero open blockers
   - zero unresolved `ONESHOT-BLOCKER:*` markers
@@ -157,6 +170,9 @@ Required command surface:
 - `specctl impact refresh`
 - `specctl epic create`
 - `specctl epic check`
+- `specctl epic migrate-agentic`
+- `specctl codex setup`
+- `specctl codex check`
 - `specctl oneshot run`
 - `specctl oneshot resume`
 - `specctl oneshot check`

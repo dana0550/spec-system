@@ -1,4 +1,4 @@
-# Release And PR Workflow (v2.2)
+# Release And PR Workflow (v2.4)
 
 ## Required Validation Before PR
 
@@ -6,8 +6,9 @@
 2. `specctl render --check`
 3. `specctl check`
 4. `specctl impact scan`
-5. Unit and integration tests
-6. For epic changes, `specctl epic check --epic-id <E-ID>` and `specctl oneshot check --epic-id <E-ID>`
+5. `specctl codex check` (for repositories using Codex compatibility assets)
+6. Unit and integration tests
+7. For epic changes, `specctl epic check --epic-id <E-ID>` and `specctl oneshot check --epic-id <E-ID>`
 
 Blocking condition:
 
@@ -29,6 +30,7 @@ Blocking condition:
 - No placeholders in PR template.
 - `specctl check` passes.
 - `specctl impact scan` reports zero open suspects.
+- If Codex assets are tracked, `specctl codex check` passes.
 - For epic runs, `specctl oneshot finalize` succeeded with zero open blockers.
 - Migration path documented for users.
 - README and agent prompt are aligned with v2 command interface.

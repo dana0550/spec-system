@@ -1,0 +1,25 @@
+# Project-scoped Codex configuration for Spec System.
+model = "gpt-5.4"
+profile = "spec-agentic"
+project_doc_max_bytes = 65536
+
+[profiles.spec-agentic]
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+web_search = "cached"
+
+[profiles.spec-ci]
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+approval_policy = "never"
+web_search = "disabled"
+
+[profiles.spec-review]
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+approval_policy = "never"
+web_search = "cached"

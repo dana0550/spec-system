@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
@@ -15,6 +16,7 @@ from specctl.commands import oneshot_finalize as oneshot_finalize_command
 from specctl.commands import oneshot_resume as oneshot_resume_command
 from specctl.commands import render as render_command
 from specctl.commands import report as report_command
+from specctl.constants import NEEDS_INPUT_EXIT_CODE
 from specctl.feature_index import read_feature_rows
 from specctl.models import OneShotStats, TraceabilityStats
 from specctl.oneshot_utils import parse_blockers
@@ -573,6 +575,8 @@ def test_oneshot_finalize_blocks_until_impact_refresh_ack(tmp_path: Path) -> Non
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -725,6 +729,8 @@ def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -744,6 +750,929 @@ def test_epic_create_scaffolds_feature_tree_and_contract(tmp_path: Path) -> None
     assert len(oneshot["checkpoint_graph"]) == 13
     assert oneshot["checkpoint_graph"][0]["depends_on"] == []
     assert oneshot["checkpoint_graph"][1]["depends_on"] == [oneshot["checkpoint_graph"][0]["checkpoint_id"]]
+
+
+def test_epic_create_agentic_noninteractive_requires_question_pack(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    question_pack = root / "pending-questions.yaml"
+    _write_epic_brief(brief_path, include_ui=True)
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticMissingAnswers",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(question_pack),
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    assert question_pack.exists()
+    question_payload = yaml.safe_load(question_pack.read_text(encoding="utf-8"))
+    question_ids = {row["question_id"] for row in question_payload["questions"]}
+    assert "Q-AGENTIC-001" in question_ids
+    assert "Q-AGENTIC-002" in question_ids
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 |" not in epics_text
+
+
+def test_epic_create_agentic_with_answers_writes_planning_epic(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve activation conversion",
+                "Q-AGENTIC-002: SOC2 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AgenticOnboarding",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--runner-policy",
+                "fallback",
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | AgenticOnboarding | planning | F-001 |" in epics_text
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    assert (epic_dir / "research.md").exists()
+    assert (epic_dir / "questions.yaml").exists()
+    assert (epic_dir / "answers.yaml").exists()
+    assert (epic_dir / "agentic_state.json").exists()
+
+    oneshot = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert "generation_run_id" in oneshot
+    assert oneshot["synthesis_quality_profile"]["minimums"]["requirements"] == 3
+    assert oneshot["approval_gates"]["mode"] == "two-gate"
+
+    rows = read_feature_rows(root / "docs" / "FEATURES.md")
+    assert rows
+    assert all(row.status == "tasks_draft" for row in rows)
+
+    first_feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    req_text = (first_feature_dir / "requirements.md").read_text(encoding="utf-8")
+    design_text = (first_feature_dir / "design.md").read_text(encoding="utf-8")
+    verification_text = (first_feature_dir / "verification.md").read_text(encoding="utf-8")
+    assert len(re.findall(r"^\s*[-*]\s*R-F001(?:\.\d{2})*-\d{3}", req_text, flags=re.MULTILINE)) >= 3
+    assert "## Architecture" in design_text
+    assert "## Requirement Mapping" in design_text
+    assert "TBD" not in verification_text.upper()
+
+
+def test_oneshot_run_transitions_planning_epic_to_implementing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Reduce onboarding churn",
+                "Q-AGENTIC-002: ISO27001 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AgenticLifecycle",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--runner-policy",
+                "fallback",
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+    epics_text = (root / "docs" / "EPICS.md").read_text(encoding="utf-8")
+    assert "| E-001 | AgenticLifecycle | implementing | F-001 |" in epics_text
+
+
+def test_epic_create_agentic_supports_claude_runner(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve operator throughput",
+                "Q-AGENTIC-002: GDPR controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ClaudeRunnerEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--runner",
+                "claude",
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot_payload["runner"] == "claude"
+
+
+def test_epic_migrate_agentic_check_and_apply(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrationTarget",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--check",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 1
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    assert (epic_dir / "research.md").exists()
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot_payload["synthesis_quality_profile"]["minimums"]["tasks"] == 3
+
+
+def test_epic_migrate_agentic_honors_runner_and_answers_file(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrationAnswersTarget",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    answers = root / "migration-answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Custom migration KPI",
+                "Q-AGENTIC-002: Custom migration constraints",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner",
+                "claude",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+
+    feature_dir = next((root / "docs" / "features").glob("F-001-*"))
+    requirements = (feature_dir / "requirements.md").read_text(encoding="utf-8")
+    assert "Custom migration KPI" in requirements
+    assert "Custom migration constraints" in requirements
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot_payload["synthesis_quality_profile"]["migration_runner"] == "claude"
+
+
+def test_epic_migrate_agentic_emits_question_pack_when_required_answers_missing(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrationQuestionPackTarget",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    question_pack = root / "migrate-questions.yaml"
+    rc = main(
+        [
+            "epic",
+            "migrate-agentic",
+            "--root",
+            str(root),
+            "--epic-id",
+            "E-001",
+            "--check",
+            "--no-interactive",
+            "--question-pack-out",
+            str(question_pack),
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    assert question_pack.exists()
+    payload = yaml.safe_load(question_pack.read_text(encoding="utf-8"))
+    question_ids = {row["question_id"] for row in payload["questions"]}
+    assert "Q-AGENTIC-001" in question_ids
+    assert "Q-AGENTIC-002" in question_ids
+
+
+def test_epic_migrate_agentic_reports_scanned_upgrades_before_needs_input(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AlreadyMigratedEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 0
+    )
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "PendingMigrationEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    capsys.readouterr()
+    rc = main(
+        [
+            "epic",
+            "migrate-agentic",
+            "--root",
+            str(root),
+            "--check",
+            "--runner-policy",
+            "strict",
+            "--no-interactive",
+            "--json",
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "needs_input"
+    assert payload["phase"] == "migration_questions"
+    assert payload["upgrades_count"] > 0
+    assert any(item["epic_id"] == "E-002" for item in payload["upgrades"])
+
+
+def test_epic_migrate_agentic_json_output_is_single_object(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "MigrateJsonSingleObject",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+    answers = root / "migration-answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Reliability KPI",
+                "Q-AGENTIC-002: Migration constraints",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    capsys.readouterr()
+    rc = main(
+        [
+            "epic",
+            "migrate-agentic",
+            "--root",
+            str(root),
+            "--epic-id",
+            "E-001",
+            "--apply",
+            "--runner-policy",
+            "strict",
+            "--no-interactive",
+            "--answers-file",
+            str(answers),
+            "--json",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["phase"] == "apply"
+    assert payload["runner_policy"] == "strict"
+    assert payload["epics_scanned"] == ["E-001"]
+    assert isinstance(payload["upgrades"], list)
+
+
+def test_epic_create_agentic_strict_auto_resolves_codex_command(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve conversion",
+                "Q-AGENTIC-002: SOC2 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND_CODEX", raising=False)
+    monkeypatch.delenv("SPECCTL_AGENTIC_RUNNER_COMMAND", raising=False)
+    captured_commands: list[str] = []
+
+    def invoke_stub(*, runner: str, command: str, payload: dict, root: Path, phase: str):
+        del payload, root
+        captured_commands.append(command)
+        return (
+            {
+                "decomposition_nodes": [],
+                "research_findings": [],
+                "questions": [],
+                "feature_synthesis": [],
+            },
+            SimpleNamespace(
+                provider=runner,
+                command=command,
+                phase=phase,
+                events_count=1,
+                session_id="se_test",
+                thread_id="th_test",
+                resumed_from_thread_id="",
+            ),
+            None,
+        )
+
+    monkeypatch.setattr(epic_create_command, "invoke_runner_adapter", invoke_stub)
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticStrictRunner",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--codex-surface",
+            "ci",
+            "--codex-profile",
+            "spec-ci",
+            "--no-interactive",
+            "--answers-file",
+            str(answers),
+        ]
+    )
+    assert rc == 0
+    expected = "codex exec --json -o --profile spec-ci --no-interactive"
+    assert captured_commands
+    assert all(command == expected for command in captured_commands)
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert oneshot["runner_command"] == expected
+
+
+def test_epic_create_agentic_json_needs_input_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    question_pack = root / "pending.json.yaml"
+    _write_epic_brief(brief_path, include_ui=True)
+    capsys.readouterr()
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticJsonNeedsInput",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(question_pack),
+            "--json",
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "needs_input"
+    assert payload["phase"] == "question_loop"
+    assert payload["artifact_paths"]["question_pack"] == str(question_pack)
+
+
+def test_epic_create_agentic_json_missing_brief_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    missing_brief = root / "does-not-exist-brief.md"
+    capsys.readouterr()
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticMissingBrief",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(missing_brief),
+            "--json",
+        ]
+    )
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert payload["phase"] == "brief_ingest"
+    assert "Brief file not found" in payload["error"]
+
+
+def test_epic_create_agentic_json_invalid_feature_id_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    capsys.readouterr()
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticInvalidFeatureId",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--feature-id",
+            "bad-id",
+            "--json",
+        ]
+    )
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert payload["phase"] == "feature_preflight"
+    assert "Invalid feature ID format" in payload["error"]
+
+
+def test_codex_setup_and_check_commands(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+
+    assert main(["codex", "setup", "--root", str(root)]) == 0
+    assert (root / "AGENTS.md").exists()
+    assert (root / ".codex" / "config.toml").exists()
+    assert (root / "scripts" / "codex" / "worktree-setup.sh").exists()
+    assert (root / "scripts" / "codex" / "project-actions.sh").exists()
+    assert (root / "assets" / "codex" / "automations" / "spec-quality-check.md").exists()
+    assert (root / "assets" / "codex" / "automations" / "migration-audit.md").exists()
+    assert main(["codex", "check", "--root", str(root)]) == 0
+
+
+def test_codex_check_detects_missing_assets(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["codex", "check", "--root", str(root)]) == 1
+
+
+def test_codex_check_fails_for_malformed_config(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["codex", "setup", "--root", str(root)]) == 0
+    capsys.readouterr()
+    (root / ".codex" / "config.toml").write_text("[profiles.spec-agentic\nmodel = 'gpt-5.4'\n", encoding="utf-8")
+
+    rc = main(["codex", "check", "--root", str(root), "--json"])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert any("parse error" in item for item in payload["missing"])
+
+
+def test_codex_check_fails_when_required_profile_key_missing(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["codex", "setup", "--root", str(root)]) == 0
+    capsys.readouterr()
+    config = root / ".codex" / "config.toml"
+    config_text = config.read_text(encoding="utf-8")
+    config.write_text(config_text.replace('web_search = "cached"', ""), encoding="utf-8")
+
+    rc = main(["codex", "check", "--root", str(root), "--json"])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert any("web_search" in item for item in payload["missing"])
+
+
+def test_epic_create_agentic_per_feature_approval_ledger(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answer_lines = [
+        "Q-AGENTIC-001: Improve activation conversion",
+        "Q-AGENTIC-002: SOC2 controls apply",
+        "A-AGENTIC-DECOMPOSITION: yes",
+    ]
+    for idx in range(1, 50):
+        answer_lines.append(f"A-AGENTIC-COMMIT-{idx:03d}: yes")
+    answers.write_text("\n".join(answer_lines) + "\n", encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "PerFeatureLedger",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--runner-policy",
+                "fallback",
+                "--approval-mode",
+                "per-feature",
+                "--no-interactive",
+                "--answers-file",
+                str(answers),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    oneshot_payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    ledger = oneshot_payload["approval_gates"]["ledger"]
+    assert ledger
+    assert any(item["gate_id"].startswith("A-AGENTIC-COMMIT-") for item in ledger)
+
+
+def test_epic_create_agentic_json_success_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    answers = root / "answers.yaml"
+    answers.write_text(
+        "\n".join(
+            [
+                "Q-AGENTIC-001: Improve activation conversion",
+                "Q-AGENTIC-002: SOC2 controls apply",
+                "A-AGENTIC-DECOMPOSITION: yes",
+                "A-AGENTIC-COMMIT: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticJsonSuccess",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--answers-file",
+            str(answers),
+            "--json",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["phase"] == "commit"
+    assert Path(payload["artifact_paths"]["oneshot"]).exists()
+
+
+def test_epic_create_agentic_multiple_question_pack_paths_do_not_conflict(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+
+    brief_a = root / "epic-a.md"
+    brief_b = root / "epic-b.md"
+    _write_epic_brief(brief_a, include_ui=True)
+    _write_epic_brief(brief_b, include_ui=True)
+    pack_a = root / "packs" / "pack-a.yaml"
+    pack_b = root / "packs" / "pack-b.yaml"
+
+    rc_a = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticPackA",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_a),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(pack_a),
+        ]
+    )
+    rc_b = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticPackB",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_b),
+            "--runner-policy",
+            "fallback",
+            "--no-interactive",
+            "--question-pack-out",
+            str(pack_b),
+        ]
+    )
+    assert rc_a == NEEDS_INPUT_EXIT_CODE
+    assert rc_b == NEEDS_INPUT_EXIT_CODE
+    assert pack_a.exists()
+    assert pack_b.exists()
+    assert "epic_name: AgenticPackA" in pack_a.read_text(encoding="utf-8")
+    assert "epic_name: AgenticPackB" in pack_b.read_text(encoding="utf-8")
 
 
 def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch) -> None:
@@ -767,6 +1696,8 @@ def test_epic_create_returns_error_when_render_fails(tmp_path: Path, monkeypatch
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 1
@@ -800,6 +1731,8 @@ def test_epic_create_passes_precomputed_stats_to_render(tmp_path: Path, monkeypa
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -826,6 +1759,8 @@ def test_oneshot_check_fails_when_validation_commands_missing(tmp_path: Path) ->
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -856,6 +1791,8 @@ def test_oneshot_run_uses_soft_blocker_for_non_integrity_failure(tmp_path: Path)
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -897,6 +1834,8 @@ def test_oneshot_run_handles_missing_validation_binary_without_crashing(tmp_path
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -939,6 +1878,8 @@ def test_oneshot_run_empty_validation_commands_passes_without_blockers(tmp_path:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -978,6 +1919,8 @@ def test_oneshot_run_precreates_events_log_when_no_checkpoint_executes(tmp_path:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1017,6 +1960,8 @@ def test_oneshot_run_and_finalize_marks_scope_done(tmp_path: Path) -> None:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1057,6 +2002,8 @@ def test_oneshot_finalize_fails_with_open_blockers(tmp_path: Path) -> None:
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1093,6 +2040,8 @@ def test_oneshot_finalize_short_circuits_validation_when_blocked(tmp_path: Path,
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1131,6 +2080,8 @@ def test_oneshot_finalize_blocks_done_transition_on_finalize_validation_failure(
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1178,6 +2129,8 @@ def test_oneshot_finalize_rolls_back_render_outputs_on_render_failure(tmp_path: 
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1233,6 +2186,8 @@ def test_oneshot_finalize_continues_rollback_when_one_restore_fails(tmp_path: Pa
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1291,6 +2246,8 @@ def test_oneshot_finalize_rolls_back_on_epic_write_failure(tmp_path: Path, monke
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1343,6 +2300,8 @@ def test_oneshot_finalize_rolls_back_when_run_state_is_invalid(tmp_path: Path) -
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1390,6 +2349,8 @@ def test_oneshot_finalize_passes_precomputed_stats_to_render(tmp_path: Path, mon
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1431,6 +2392,8 @@ def test_oneshot_resume_resolves_blockers_for_passed_checkpoints(tmp_path: Path)
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1477,6 +2440,8 @@ def test_oneshot_resume_does_not_duplicate_open_blockers_for_retried_checkpoint(
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1523,6 +2488,8 @@ def test_oneshot_resume_processes_in_progress_checkpoint(tmp_path: Path) -> None
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1575,6 +2542,8 @@ def test_oneshot_resume_handles_missing_validation_binary_without_crashing(tmp_p
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1623,6 +2592,8 @@ def test_oneshot_run_retries_pending_checkpoints_after_late_dependency_pass(tmp_
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1665,6 +2636,8 @@ def test_oneshot_resume_retries_pending_checkpoints_after_late_dependency_pass(t
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
@@ -1717,6 +2690,8 @@ def test_oneshot_resume_stops_when_status_leaves_resumable_states(tmp_path: Path
                 "owner@example.com",
                 "--brief",
                 str(brief_path),
+                "--mode",
+                "deterministic",
             ]
         )
         == 0
