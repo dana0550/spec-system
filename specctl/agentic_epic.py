@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import re
-import shlex
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -208,76 +206,6 @@ def default_questions(root_name: str, brief_sections: dict[str, str]) -> list[Ag
             )
         )
     return questions
-
-
-def invoke_runner(command: str, payload: dict[str, Any], root: Path) -> tuple[dict[str, Any] | None, str | None]:
-    stripped = command.strip()
-    if not stripped:
-        return None, "Runner command is empty"
-    try:
-        argv = shlex.split(stripped)
-    except ValueError as exc:
-        return None, f"Invalid runner command syntax: {exc}"
-    try:
-        proc = subprocess.run(
-            argv,
-            cwd=root,
-            shell=False,
-            input=json.dumps(payload, sort_keys=True),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-        )
-    except OSError as exc:
-        return None, f"Unable to execute runner command '{argv[0]}': {exc}"
-
-    output = proc.stdout or ""
-    if proc.returncode != 0:
-        return None, f"Runner command failed ({proc.returncode}): {output[-2000:]}"
-
-    normalized, err = parse_runner_json(output)
-    if err:
-        return None, err
-    return normalized, None
-
-
-def parse_runner_json(output: str) -> tuple[dict[str, Any] | None, str | None]:
-    output = output.strip()
-    if not output:
-        return None, "Runner produced empty output"
-
-    payload: Any
-    try:
-        payload = json.loads(output)
-    except json.JSONDecodeError:
-        start = output.find("{")
-        end = output.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            return None, "Runner output does not contain valid JSON"
-        try:
-            payload = json.loads(output[start : end + 1])
-        except json.JSONDecodeError as exc:
-            return None, f"Runner JSON parse failure: {exc}"
-
-    if not isinstance(payload, dict):
-        return None, "Runner JSON root must be an object"
-
-    normalized = {
-        "decomposition_nodes": payload.get("decomposition_nodes", []),
-        "research_findings": payload.get("research_findings", []),
-        "questions": payload.get("questions", []),
-        "feature_synthesis": payload.get("feature_synthesis", []),
-    }
-    if not isinstance(normalized["decomposition_nodes"], list):
-        normalized["decomposition_nodes"] = []
-    if not isinstance(normalized["research_findings"], list):
-        normalized["research_findings"] = []
-    if not isinstance(normalized["questions"], list):
-        normalized["questions"] = []
-    if not isinstance(normalized["feature_synthesis"], list):
-        normalized["feature_synthesis"] = []
-    return normalized, None
 
 
 def merge_questions(base: list[AgenticQuestion], runner_questions: list[dict[str, Any]]) -> list[AgenticQuestion]:

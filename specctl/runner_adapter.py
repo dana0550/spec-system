@@ -78,16 +78,6 @@ def ensure_runner_available(*, runner: str, runner_policy: str, command: str) ->
     )
 
 
-def build_codex_exec_command(*, codex_surface: str, codex_profile: str) -> str:
-    surface = validate_codex_surface(codex_surface)
-    parts = ["codex", "exec", "--json", "-o"]
-    if codex_profile:
-        parts.extend(["--profile", codex_profile])
-    if surface == "ci":
-        parts.extend(["--no-interactive"])
-    return " ".join(parts)
-
-
 def invoke_runner_adapter(
     *,
     runner: str,

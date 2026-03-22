@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from specctl.agentic_epic import parse_runner_json, synthesize_feature_artifacts, validate_feature_quality
+from specctl.agentic_epic import synthesize_feature_artifacts, validate_feature_quality
 from specctl.models import FeatureRow
+from specctl.runner_adapter import parse_runner_json
 
 
 def _feature_row(feature_id: str = "F-001") -> FeatureRow:

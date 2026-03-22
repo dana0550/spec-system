@@ -4,7 +4,6 @@ import json
 
 from specctl.runner_adapter import (
     behavior_for_depth,
-    build_codex_exec_command,
     default_runner_policy,
     parse_codex_jsonl_output,
     parse_runner_json,
@@ -30,11 +29,6 @@ def test_default_runner_policy_prefers_strict_for_agentic_codex() -> None:
     assert default_runner_policy("agentic", "claude", None) == "fallback"
     assert default_runner_policy("deterministic", "codex", None) == "fallback"
     assert default_runner_policy("agentic", "codex", "fallback") == "fallback"
-
-
-def test_build_codex_exec_command_uses_profile_and_surface() -> None:
-    assert build_codex_exec_command(codex_surface="auto", codex_profile="spec-agentic") == "codex exec --json -o --profile spec-agentic"
-    assert "--no-interactive" in build_codex_exec_command(codex_surface="ci", codex_profile="spec-ci")
 
 
 def test_parse_codex_jsonl_output_extracts_runner_payload_and_state() -> None:
