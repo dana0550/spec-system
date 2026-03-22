@@ -14,7 +14,6 @@ from specctl.agentic_epic import (
     is_interactive_mode,
     load_answers_file,
     merge_questions,
-    render_research_log,
     resolve_questions,
     resolve_runner_command,
     synthesize_feature_artifacts,
@@ -651,6 +650,10 @@ def _merge_runner_nodes(base_nodes: list[dict[str, Any]], candidate_nodes: list[
         if temp_id in known_temp:
             continue
         parent_temp = str(node.get("parent_temp_id", "N-ROOT")).strip() or "N-ROOT"
+        try:
+            confidence = float(node.get("confidence", 0.7))
+        except (TypeError, ValueError):
+            confidence = 0.7
         merged.append(
             {
                 "temp_id": temp_id,
@@ -658,7 +661,7 @@ def _merge_runner_nodes(base_nodes: list[dict[str, Any]], candidate_nodes: list[
                 "name": name,
                 "node_type": str(node.get("node_type", "capability")),
                 "rationale": str(node.get("rationale", "Runner-provided decomposition rationale.")),
-                "confidence": float(node.get("confidence", 0.7)),
+                "confidence": confidence,
                 "source_refs": node.get("source_refs", root.get("source_refs", [])),
             }
         )
