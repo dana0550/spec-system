@@ -1412,6 +1412,67 @@ def test_epic_create_agentic_json_needs_input_payload(tmp_path: Path, capsys) ->
     assert payload["artifact_paths"]["question_pack"] == str(question_pack)
 
 
+def test_epic_create_agentic_json_missing_brief_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    missing_brief = root / "does-not-exist-brief.md"
+    capsys.readouterr()
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticMissingBrief",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(missing_brief),
+            "--json",
+        ]
+    )
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert payload["phase"] == "brief_ingest"
+    assert "Brief file not found" in payload["error"]
+
+
+def test_epic_create_agentic_json_invalid_feature_id_payload(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path, include_ui=True)
+    capsys.readouterr()
+
+    rc = main(
+        [
+            "epic",
+            "create",
+            "--root",
+            str(root),
+            "--name",
+            "AgenticInvalidFeatureId",
+            "--owner",
+            "owner@example.com",
+            "--brief",
+            str(brief_path),
+            "--feature-id",
+            "bad-id",
+            "--json",
+        ]
+    )
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert payload["phase"] == "feature_preflight"
+    assert "Invalid feature ID format" in payload["error"]
+
+
 def test_codex_setup_and_check_commands(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()

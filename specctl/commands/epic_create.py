@@ -284,28 +284,48 @@ def _run_agentic(args) -> int:
     docs = root / "docs"
     features_path = docs / "FEATURES.md"
     epics_path = docs / "EPICS.md"
+
+    def _emit_error(*, phase: str, error: str) -> int:
+        payload = {
+            "status": "error",
+            "phase": phase,
+            "error": error,
+            "pending_questions": 0,
+            "artifact_paths": {},
+        }
+        if getattr(args, "json", False):
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print(f"[ERROR] {error}")
+        return 1
+
     brief_path = Path(args.brief).resolve()
     if not brief_path.exists():
-        print(f"[ERROR] Brief file not found: {brief_path}")
-        return 1
+        return _emit_error(phase="brief_ingest", error=f"Brief file not found: {brief_path}")
 
     brief_text = read_text(brief_path)
     sections = parse_brief_sections(brief_text)
     missing_sections = [name for name in REQUIRED_BRIEF_SECTIONS if name not in sections]
     if missing_sections:
-        print(f"[ERROR] brief.md missing required sections: {', '.join(missing_sections)}")
-        return 1
+        return _emit_error(
+            phase="brief_validation",
+            error=f"brief.md missing required sections: {', '.join(missing_sections)}",
+        )
 
     feature_rows = read_feature_rows(features_path)
     epic_rows = read_epic_rows(epics_path) if epics_path.exists() else []
 
     root_feature_id = args.feature_id
     if root_feature_id and not FEATURE_ID_RE.match(root_feature_id):
-        print(f"[ERROR] Invalid feature ID format: {root_feature_id}")
-        return 1
+        return _emit_error(
+            phase="feature_preflight",
+            error=f"Invalid feature ID format: {root_feature_id}",
+        )
     if root_feature_id and any(row.feature_id == root_feature_id for row in feature_rows):
-        print(f"[ERROR] Feature ID already exists: {root_feature_id}")
-        return 1
+        return _emit_error(
+            phase="feature_preflight",
+            error=f"Feature ID already exists: {root_feature_id}",
+        )
 
     try:
         root_row_preview = create_feature_entry(
@@ -317,8 +337,7 @@ def _run_agentic(args) -> int:
             feature_id=root_feature_id,
         )
     except ValueError as exc:
-        print(f"[ERROR] {exc}")
-        return 1
+        return _emit_error(phase="feature_preflight", error=str(exc))
 
     epic_id = next_epic_id(epic_rows)
     owner = args.owner or "unassigned"

@@ -13,6 +13,7 @@ from specctl.constants import AGENTIC_DESIGN_REQUIRED_SECTIONS, AGENTIC_QUALITY_
 from specctl.io_utils import now_date, now_timestamp, read_text, write_text
 from specctl.models import FeatureRow
 from specctl.oneshot_utils import extract_bullets
+from specctl.validators.ids import DESIGN_ID_RE, REQ_ID_RE, SCENARIO_ID_RE, TASK_ID_RE
 
 
 @dataclass
@@ -480,9 +481,11 @@ def count_requirements(requirements_text: str) -> tuple[int, int]:
     req_count = 0
     scenario_count = 0
     for line in requirements_text.splitlines():
-        if re.match(r"^\s*[-*]\s*R-F\d{3}(?:\.\d{2,})*-\d{3}\s*:", line):
+        req_match = re.match(r"^\s*[-*]\s*(R-F[^\s:]+)\s*:", line)
+        if req_match and REQ_ID_RE.fullmatch(req_match.group(1)):
             req_count += 1
-        if re.match(r"^\s*[-*]\s*S-F\d{3}(?:\.\d{2,})*-\d{3}\s*:", line):
+        scenario_match = re.match(r"^\s*[-*]\s*(S-F[^\s:]+)\s*:", line)
+        if scenario_match and SCENARIO_ID_RE.fullmatch(scenario_match.group(1)):
             scenario_count += 1
     return req_count, scenario_count
 
@@ -490,7 +493,8 @@ def count_requirements(requirements_text: str) -> tuple[int, int]:
 def count_design_decisions(design_text: str) -> int:
     count = 0
     for line in design_text.splitlines():
-        if re.match(r"^\s*[-*]\s*D-F\d{3}(?:\.\d{2,})*-\d{3}\s*:", line):
+        match = re.match(r"^\s*[-*]\s*(D-F[^\s:]+)\s*:", line)
+        if match and DESIGN_ID_RE.fullmatch(match.group(1)):
             count += 1
     return count
 
@@ -498,7 +502,8 @@ def count_design_decisions(design_text: str) -> int:
 def count_tasks(tasks_text: str) -> int:
     count = 0
     for line in tasks_text.splitlines():
-        if re.match(r"^\s*[-*]\s*\[[ xX]\]\s*T-F\d{3}(?:\.\d{2,})*-\d{3}\b", line):
+        match = re.match(r"^\s*[-*]\s*\[[ xX]\]\s*(T-F[^\s:]+)\b", line)
+        if match and TASK_ID_RE.fullmatch(match.group(1)):
             count += 1
     return count
 
