@@ -128,7 +128,7 @@ def invoke_runner_adapter(
             shell=False,
             input=json.dumps(payload, sort_keys=True),
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
         )
@@ -136,15 +136,16 @@ def invoke_runner_adapter(
         return None, meta, f"Unable to execute runner command '{argv[0]}': {exc}"
 
     output = proc.stdout or ""
+    stderr_output = proc.stderr or ""
     if proc.returncode != 0:
-        return None, meta, f"Runner command failed ({proc.returncode}): {output[-2000:]}"
+        failure_output = stderr_output or output
+        return None, meta, f"Runner command failed ({proc.returncode}): {failure_output[-2000:]}"
 
     if runner == "codex":
         normalized, codex_meta, err = parse_codex_jsonl_output(output)
-        if err is None and normalized is not None:
-            codex_meta.phase = phase
-            codex_meta.command = command
-            return normalized, codex_meta, None
+        codex_meta.phase = phase
+        codex_meta.command = command
+        return normalized, codex_meta, err
     normalized, err = parse_runner_json(output)
     return normalized, meta, err
 

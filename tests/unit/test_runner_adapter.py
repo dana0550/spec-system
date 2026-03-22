@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from specctl.runner_adapter import (
     behavior_for_depth,
     build_codex_exec_command,
     default_runner_policy,
+    invoke_runner_adapter,
     parse_codex_jsonl_output,
     parse_runner_json,
     resolve_runner_command,
@@ -161,3 +163,75 @@ def test_parity_normalization_between_json_and_codex_jsonl() -> None:
     assert direct_err is None
     assert codex_err is None
     assert codex == direct
+
+
+def test_invoke_runner_adapter_preserves_codex_meta_on_parse_error(monkeypatch) -> None:
+    command = "codex exec --json -o"
+    output = "\n".join(
+        [
+            json.dumps({"type": "thread.started", "thread_id": "th_123", "session_id": "se_123"}),
+            json.dumps(
+                {
+                    "type": "thread.message",
+                    "message": {"content": [{"type": "output_text", "text": "not-json"}]},
+                }
+            ),
+        ]
+    )
+
+    class _Proc:
+        returncode = 0
+        stdout = output
+        stderr = ""
+
+    def _fake_run(*_args, **_kwargs):
+        return _Proc()
+
+    monkeypatch.setattr("specctl.runner_adapter.subprocess.run", _fake_run)
+
+    normalized, meta, err = invoke_runner_adapter(
+        runner="codex",
+        command=command,
+        payload={"phase": "requirements"},
+        root=Path("."),
+        phase="requirements",
+    )
+
+    assert normalized is None
+    assert err is not None
+    assert meta.thread_id == "th_123"
+    assert meta.session_id == "se_123"
+    assert meta.events_count == 2
+    assert meta.phase == "requirements"
+    assert meta.command == command
+
+
+def test_invoke_runner_adapter_ignores_stderr_when_parsing_json(monkeypatch) -> None:
+    payload = {
+        "decomposition_nodes": [{"temp_id": "N-ROOT", "name": "Root"}],
+        "research_findings": [],
+        "questions": [],
+        "feature_synthesis": [],
+    }
+
+    class _Proc:
+        returncode = 0
+        stdout = json.dumps(payload)
+        stderr = "warning: debug {noise}"
+
+    def _fake_run(*_args, **_kwargs):
+        return _Proc()
+
+    monkeypatch.setattr("specctl.runner_adapter.subprocess.run", _fake_run)
+
+    normalized, _, err = invoke_runner_adapter(
+        runner="claude",
+        command="runner",
+        payload={"phase": "design"},
+        root=Path("."),
+        phase="design",
+    )
+
+    assert err is None
+    assert normalized is not None
+    assert normalized["decomposition_nodes"][0]["temp_id"] == "N-ROOT"
