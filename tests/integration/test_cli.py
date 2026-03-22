@@ -1149,6 +1149,91 @@ def test_epic_migrate_agentic_emits_question_pack_when_required_answers_missing(
     assert "Q-AGENTIC-002" in question_ids
 
 
+def test_epic_migrate_agentic_reports_scanned_upgrades_before_needs_input(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief_path = root / "epic-brief.md"
+    _write_epic_brief(brief_path)
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AlreadyMigratedEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "migrate-agentic",
+                "--root",
+                str(root),
+                "--epic-id",
+                "E-001",
+                "--apply",
+                "--runner-policy",
+                "fallback",
+            ]
+        )
+        == 0
+    )
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "PendingMigrationEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief_path),
+                "--mode",
+                "deterministic",
+            ]
+        )
+        == 0
+    )
+
+    capsys.readouterr()
+    rc = main(
+        [
+            "epic",
+            "migrate-agentic",
+            "--root",
+            str(root),
+            "--check",
+            "--runner-policy",
+            "strict",
+            "--no-interactive",
+            "--json",
+        ]
+    )
+    assert rc == NEEDS_INPUT_EXIT_CODE
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "needs_input"
+    assert payload["phase"] == "migration_questions"
+    assert payload["upgrades_count"] > 0
+    assert any(item["epic_id"] == "E-002" for item in payload["upgrades"])
+
+
 def test_epic_migrate_agentic_json_output_is_single_object(tmp_path: Path, capsys) -> None:
     root = tmp_path / "workspace"
     root.mkdir()

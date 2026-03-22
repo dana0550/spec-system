@@ -118,6 +118,8 @@ def run(args) -> int:
     upgrades: list[tuple[str, str, list[str]]] = []
     updated_feature_ids: set[str] = set()
     migrated_epics: list[str] = []
+    deferred_apply_contexts = []
+    pending_question_payload = None
 
     for epic in epics:
         epic_dir = docs / epic.epic_path
@@ -156,49 +158,7 @@ def run(args) -> int:
             }
             effective_answers.update(provided_answers)
 
-        if runner_policy == "strict" or question_mode_enabled:
-            resolved_answers, pending = resolve_questions(
-                questions=questions,
-                seed_answers=dict(effective_answers),
-                interactive=interactive,
-            )
-            if pending:
-                write_question_pack(
-                    question_pack_path,
-                    epic_name=epic.name,
-                    questions=pending,
-                    answers=resolved_answers,
-                )
-                if getattr(args, "json", False):
-                    print(
-                        json.dumps(
-                            {
-                                "status": "needs_input",
-                                "phase": "migration_questions",
-                                "runner": runner,
-                                "runner_policy": runner_policy,
-                                "epics_scanned": epics_scanned,
-                                "epics_with_upgrades": sorted(set(migrated_epics)),
-                                "upgrades_count": len(upgrades),
-                                "pending_questions": len(pending),
-                                "upgrades": [
-                                    {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
-                                    for epic_id, feature_id, issues in upgrades
-                                ],
-                                "artifact_paths": {"question_pack": str(question_pack_path)},
-                            },
-                            indent=2,
-                            sort_keys=True,
-                        )
-                    )
-                else:
-                    print(
-                        f"[NEEDS_INPUT] Missing required migration answers for {epic.epic_id}; "
-                        f"wrote question pack to {question_pack_path}"
-                    )
-                return NEEDS_INPUT_EXIT_CODE
-            effective_answers.update(resolved_answers)
-
+        epic_upgrade_feature_ids: list[str] = []
         for feature_id in scope:
             row = feature_by_id.get(feature_id)
             if row is None:
@@ -208,10 +168,129 @@ def run(args) -> int:
             if not issues:
                 continue
             upgrades.append((epic.epic_id, feature_id, issues))
+            epic_upgrade_feature_ids.append(feature_id)
             epic_had_upgrade = True
-            if dry_run:
-                continue
 
+        if epic_had_upgrade:
+            migrated_epics.append(epic.epic_id)
+
+        if runner_policy == "strict" or question_mode_enabled:
+            resolved_answers, pending = resolve_questions(
+                questions=questions,
+                seed_answers=dict(effective_answers),
+                interactive=interactive,
+            )
+            if pending:
+                if pending_question_payload is None:
+                    pending_question_payload = {
+                        "epic_id": epic.epic_id,
+                        "epic_name": epic.name,
+                        "pending": pending,
+                        "answers": resolved_answers,
+                    }
+                continue
+            effective_answers.update(resolved_answers)
+
+        if dry_run:
+            continue
+        deferred_apply_contexts.append(
+            {
+                "epic": epic,
+                "epic_dir": epic_dir,
+                "oneshot_path": oneshot_path,
+                "payload": payload,
+                "questions": questions,
+                "answers": effective_answers,
+                "upgrade_feature_ids": epic_upgrade_feature_ids,
+            }
+        )
+
+    if pending_question_payload is not None:
+        write_question_pack(
+            question_pack_path,
+            epic_name=pending_question_payload["epic_name"],
+            questions=pending_question_payload["pending"],
+            answers=pending_question_payload["answers"],
+        )
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "needs_input",
+                        "phase": "migration_questions",
+                        "runner": runner,
+                        "runner_policy": runner_policy,
+                        "epics_scanned": epics_scanned,
+                        "epics_with_upgrades": sorted(set(migrated_epics)),
+                        "upgrades_count": len(upgrades),
+                        "pending_questions": len(pending_question_payload["pending"]),
+                        "upgrades": [
+                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                            for epic_id, feature_id, issues in upgrades
+                        ],
+                        "artifact_paths": {"question_pack": str(question_pack_path)},
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                f"[NEEDS_INPUT] Missing required migration answers for {pending_question_payload['epic_id']}; "
+                f"wrote question pack to {question_pack_path}"
+            )
+        return NEEDS_INPUT_EXIT_CODE
+
+    if not getattr(args, "json", False):
+        if upgrades:
+            print("Agentic migration findings:")
+            for epic_id, feature_id, issues in upgrades:
+                issue_text = "; ".join(issues)
+                print(f"- {epic_id} / {feature_id}: {issue_text}")
+        else:
+            print("No migration upgrades required.")
+
+    if dry_run:
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "status": "dry_run",
+                        "phase": "scan",
+                        "runner": runner,
+                        "upgrades_count": len(upgrades),
+                        "runner_policy": runner_policy,
+                        "epics_scanned": epics_scanned,
+                        "epics_with_upgrades": sorted(set(migrated_epics)),
+                        "pending_questions": 0,
+                        "upgrades": [
+                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
+                            for epic_id, feature_id, issues in upgrades
+                        ],
+                        "artifact_paths": {},
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("Dry-run mode enabled (default). Re-run with --apply to write changes.")
+        return 1 if upgrades else 0
+
+    for context in deferred_apply_contexts:
+        epic = context["epic"]
+        epic_dir = context["epic_dir"]
+        oneshot_path = context["oneshot_path"]
+        payload = context["payload"]
+        questions = context["questions"]
+        effective_answers = context["answers"]
+        epic_upgrade_feature_ids = context["upgrade_feature_ids"]
+
+        for feature_id in epic_upgrade_feature_ids:
+            row = feature_by_id.get(feature_id)
+            if row is None:
+                continue
+            feature_dir = (docs / row.spec_path).parent
             if row.status in {"requirements_draft", "requirements_approved", "design_draft", "design_approved"}:
                 row.status = "tasks_draft"
             artifacts = synthesize_feature_artifacts(
@@ -225,12 +304,6 @@ def run(args) -> int:
                 path = feature_dir / filename
                 write_text(path, text)
             updated_feature_ids.add(feature_id)
-
-        if epic_had_upgrade:
-            migrated_epics.append(epic.epic_id)
-
-        if dry_run:
-            continue
 
         payload.setdefault("synthesis_quality_profile", {})
         profile = payload["synthesis_quality_profile"]
@@ -324,44 +397,6 @@ def run(args) -> int:
                         ]
                     },
                 )
-            else:
-                path.write_text("{}\n", encoding="utf-8")
-
-    if not getattr(args, "json", False):
-        if upgrades:
-            print("Agentic migration findings:")
-            for epic_id, feature_id, issues in upgrades:
-                issue_text = "; ".join(issues)
-                print(f"- {epic_id} / {feature_id}: {issue_text}")
-        else:
-            print("No migration upgrades required.")
-
-    if dry_run:
-        if getattr(args, "json", False):
-            print(
-                json.dumps(
-                    {
-                        "status": "dry_run",
-                        "phase": "scan",
-                        "runner": runner,
-                        "upgrades_count": len(upgrades),
-                        "runner_policy": runner_policy,
-                        "epics_scanned": epics_scanned,
-                        "epics_with_upgrades": sorted(set(migrated_epics)),
-                        "pending_questions": 0,
-                        "upgrades": [
-                            {"epic_id": epic_id, "feature_id": feature_id, "issues": issues}
-                            for epic_id, feature_id, issues in upgrades
-                        ],
-                        "artifact_paths": {},
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-        else:
-            print("Dry-run mode enabled (default). Re-run with --apply to write changes.")
-        return 1 if upgrades else 0
 
     if updated_feature_ids:
         write_feature_rows(features_path, feature_rows, version="2.4.0")
