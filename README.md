@@ -70,8 +70,8 @@ specctl check --strict
 ## Workflow
 ### Feature workflow (phase-gated)
 1. `requirements_draft -> requirements_approved`
-2. `design_draft -> design_approved`
-3. `tasks_draft -> tasks_approved`
+2. `requirements_approved -> design_approved` (or `design_draft -> design_approved` for imported/manual states)
+3. `design_approved -> tasks_approved` (or `tasks_draft -> tasks_approved` for imported/manual states)
 4. `implementing -> verifying -> done`
 
 Each feature lives in `docs/features/F-###-<slug>/`:
@@ -80,6 +80,23 @@ Each feature lives in `docs/features/F-###-<slug>/`:
 - `design.md`
 - `tasks.md`
 - `verification.md`
+
+### Approval gate runbook (single feature)
+Resolve impact suspects before each phase approval:
+
+```bash
+specctl impact scan --feature-id F-001
+specctl impact refresh --feature-id F-001
+specctl approve --feature-id F-001 --phase requirements
+
+specctl impact scan --feature-id F-001
+specctl impact refresh --feature-id F-001 [--ack-upstream]
+specctl approve --feature-id F-001 --phase design
+
+specctl impact scan --feature-id F-001
+specctl impact refresh --feature-id F-001 [--ack-upstream]
+specctl approve --feature-id F-001 --phase tasks
+```
 
 ### Core invariants
 - Requirements use EARS trigger terms and RFC modal keywords.
