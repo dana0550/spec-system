@@ -40,7 +40,7 @@ def read_contract_change_rows(path: Path) -> list[ContractChangeRow]:
     return rows
 
 
-def write_contract_change_rows(path: Path, rows: list[ContractChangeRow], version: str = "2.4.0") -> None:
+def write_contract_change_rows(path: Path, rows: list[ContractChangeRow], version: str = "2.1.0") -> None:
     lines = [
         "---",
         "doc_type: contract_change_index",
