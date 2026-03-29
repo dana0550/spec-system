@@ -6,6 +6,7 @@ from specctl import __version__
 from specctl.commands import (
     approve,
     check,
+    contract_create,
     codex_check,
     codex_setup,
     epic_check,
@@ -54,6 +55,17 @@ def build_parser() -> argparse.ArgumentParser:
     feature_check_parser.add_argument("--root", default=".")
     feature_check_parser.add_argument("--feature-id", required=True)
     feature_check_parser.set_defaults(func=feature_check.run)
+
+    contract_parser = subparsers.add_parser("contract", help="Contract change operations")
+    contract_sub = contract_parser.add_subparsers(dest="contract_command", required=True)
+
+    contract_create_parser = contract_sub.add_parser("create", help="Create a contract change document")
+    contract_create_parser.add_argument("--root", default=".")
+    contract_create_parser.add_argument("--name", required=True)
+    contract_create_parser.add_argument("--contract-change-id")
+    contract_create_parser.add_argument("--change-type", default="api_contract_changed")
+    contract_create_parser.add_argument("--owner", default="unassigned")
+    contract_create_parser.set_defaults(func=contract_create.run)
 
     impact_parser = subparsers.add_parser("impact", help="Impact analysis operations")
     impact_sub = impact_parser.add_subparsers(dest="impact_command", required=True)

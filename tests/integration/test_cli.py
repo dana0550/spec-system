@@ -18,7 +18,7 @@ from specctl.commands import render as render_command
 from specctl.commands import report as report_command
 from specctl.constants import NEEDS_INPUT_EXIT_CODE
 from specctl.feature_index import read_feature_rows
-from specctl.models import OneShotStats, TraceabilityStats
+from specctl.models import ContractChangeStats, OneShotStats, TraceabilityStats
 from specctl.oneshot_utils import parse_blockers
 from specctl.validators.project import lint_project as real_lint_project
 
@@ -34,6 +34,7 @@ def test_init_creates_valid_structure(tmp_path: Path) -> None:
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
     assert (root / "docs" / "FEATURES.md").exists()
+    assert (root / "docs" / "CONTRACT_CHANGES.md").exists()
 
 
 def test_full_feature_lifecycle(tmp_path: Path) -> None:
@@ -182,6 +183,66 @@ def test_feature_name_with_pipe_roundtrips_in_features_index(tmp_path: Path) -> 
     assert rows[0].status == "requirements_draft"
 
 
+def test_contract_create_scaffolds_contract_doc_and_index(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "contract",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "Payments API Contract v2",
+                "--change-type",
+                "api_contract_added",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
+    index_text = (root / "docs" / "CONTRACT_CHANGES.md").read_text(encoding="utf-8")
+    assert "| CC-001 | Payments API Contract v2 | draft | api_contract_added | owner@example.com |" in index_text
+
+    contract_path = next((root / "docs" / "contracts").glob("CC-001-*.md"))
+    contract_text = contract_path.read_text(encoding="utf-8")
+    assert "doc_type: contract_change" in contract_text
+    assert "contract_change_id: CC-001" in contract_text
+    assert "status: draft" in contract_text
+    assert "## Downstream Notification Context" in contract_text
+    assert main(["feature", "create", "--root", str(root), "--name", "BaselineFeature", "--owner", "owner@example.com"]) == 0
+    assert main(["render", "--root", str(root)]) == 0
+    assert main(["check", "--root", str(root)]) == 0
+
+
+def test_check_fails_for_published_contract_without_pr_urls(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["contract", "create", "--root", str(root), "--name", "ContractGate", "--owner", "owner@example.com"]) == 0
+
+    index_path = root / "docs" / "CONTRACT_CHANGES.md"
+    index_path.write_text(
+        index_path.read_text(encoding="utf-8").replace("| draft |", "| published |"),
+        encoding="utf-8",
+    )
+    contract_path = next((root / "docs" / "contracts").glob("CC-001-*.md"))
+    contract_path.write_text(
+        contract_path.read_text(encoding="utf-8")
+        .replace("status: draft", "status: published")
+        .replace(
+            "|------|-------|---------|--------|-------|",
+            "|------|-------|---------|--------|-------|\n| org/repo | owner | consume new endpoint |  | opened |",
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["check", "--root", str(root)]) == 1
+
+
 def test_feature_create_requires_existing_parent(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -270,6 +331,7 @@ def test_migrate_valid_v1_fixture(tmp_path: Path) -> None:
     root = copy_fixture(tmp_path, fixture)
     assert main(["migrate-v1-to-v2", "--root", str(root)]) == 0
     assert (root / "docs" / "features" / "F-001-login" / "requirements.md").exists()
+    assert (root / "docs" / "CONTRACT_CHANGES.md").exists()
     features_text = (root / "docs" / "FEATURES.md").read_text(encoding="utf-8")
     assert "| F-001 | Login | implementing |" in features_text
 
@@ -495,7 +557,7 @@ def test_report_json_includes_runs_total(tmp_path: Path, monkeypatch, capsys) ->
     root.mkdir()
 
     def lint_stub(_root: Path):
-        return [], TraceabilityStats(), OneShotStats(epics_total=2, runs_total=7), None
+        return [], TraceabilityStats(), OneShotStats(epics_total=2, runs_total=7), None, ContractChangeStats()
 
     monkeypatch.setattr(report_command, "lint_project_with_impact", lint_stub)
     assert main(["report", "--root", str(root), "--json"]) == 0
@@ -504,6 +566,7 @@ def test_report_json_includes_runs_total(tmp_path: Path, monkeypatch, capsys) ->
     assert payload["runs_total"] == 7
     assert payload["impact_suspects_open"] == 0
     assert payload["impact_features_tracked"] == 0
+    assert payload["contract_changes_total"] == 0
 
 
 def test_impact_scan_json_schema_and_refresh_flow(tmp_path: Path, capsys) -> None:
@@ -667,6 +730,24 @@ def test_bugfix_template_contains_regression_flow() -> None:
         "## Tasks",
         "## Verification Evidence",
         "Evidence: S-FXXX-900",
+    ]
+    for token in required_tokens:
+        assert token in text
+
+
+def test_contract_change_template_contains_required_sections() -> None:
+    template_path = Path("skills/docs-spec-system/assets/templates/CONTRACT_CHANGE_TEMPLATE.md")
+    text = template_path.read_text(encoding="utf-8")
+    required_tokens = [
+        "doc_type: contract_change",
+        "contract_change_id: CC-XXX",
+        "status: draft",
+        "## Summary",
+        "## Contract Surface",
+        "## Change Details",
+        "## Compatibility and Migration Guidance",
+        "## Downstream Notification Context",
+        "| repo | owner | context | pr_url | state |",
     ]
     for token in required_tokens:
         assert token in text

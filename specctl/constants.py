@@ -13,6 +13,30 @@ FEATURE_STATUSES = {
     "deprecated",
 }
 
+CONTRACT_CHANGE_STATUSES = {
+    "draft",
+    "approved",
+    "published",
+    "closed",
+}
+
+CONTRACT_CHANGE_TYPES = {
+    "service_added",
+    "service_changed",
+    "api_contract_added",
+    "api_contract_changed",
+    "api_contract_deprecated",
+    "api_contract_removed",
+    "custom",
+}
+
+CONTRACT_TARGET_STATES = {
+    "pending",
+    "opened",
+    "merged",
+    "blocked",
+}
+
 EPIC_STATUSES = {
     "planning",
     "implementing",
@@ -47,6 +71,7 @@ EARS_TRIGGERS = {"WHEN", "IF", "WHILE", "WHERE", "WHENEVER"}
 REQUIRED_DOC_FILES = {
     "MASTER_SPEC.md",
     "FEATURES.md",
+    "CONTRACT_CHANGES.md",
     "PRODUCT_MAP.md",
     "TRACEABILITY.md",
     "STEERING.md",

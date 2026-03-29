@@ -26,6 +26,17 @@ class FeatureRow:
 
 
 @dataclass
+class ContractChangeRow:
+    contract_change_id: str
+    name: str
+    status: str
+    change_type: str
+    owner: str
+    path: str
+    aliases: str
+
+
+@dataclass
 class EpicRow:
     epic_id: str
     name: str
@@ -75,3 +86,15 @@ class ImpactScanResult:
     features_tracked: int
     suspects: tuple[ImpactSuspect, ...]
     baseline_error: Optional[str] = None
+
+
+@dataclass
+class ContractChangeStats:
+    contract_changes_total: int = 0
+    contract_changes_draft: int = 0
+    contract_changes_approved: int = 0
+    contract_changes_published: int = 0
+    contract_changes_closed: int = 0
+    contract_targets_total: int = 0
+    contract_targets_with_pr_url: int = 0
+    contract_targets_merged: int = 0
