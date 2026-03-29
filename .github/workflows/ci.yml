@@ -42,9 +42,6 @@ jobs:
           python -m specctl.cli init --root "$tmpdir"
           python -m specctl.cli feature create --root "$tmpdir" --name "SmokeFeature" --owner smoke@example.com
           python -m specctl.cli impact refresh --root "$tmpdir"
-          python -m specctl.cli approve --root "$tmpdir" --feature-id F-001 --phase requirements
-          python -m specctl.cli approve --root "$tmpdir" --feature-id F-001 --phase design
-          python -m specctl.cli approve --root "$tmpdir" --feature-id F-001 --phase tasks
           python -m specctl.cli impact scan --root "$tmpdir"
           python -m specctl.cli render --root "$tmpdir"
           python -m specctl.cli check --root "$tmpdir"

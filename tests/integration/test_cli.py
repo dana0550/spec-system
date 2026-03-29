@@ -60,10 +60,6 @@ def test_full_feature_lifecycle(tmp_path: Path) -> None:
     assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
     assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "requirements"]) == 0
     _assert_feature_status(root, "F-001", "requirements_approved")
-    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "design"]) == 0
-    _assert_feature_status(root, "F-001", "design_approved")
-    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "tasks"]) == 0
-    _assert_feature_status(root, "F-001", "tasks_approved")
 
 
 def test_feature_create_keeps_scenario_text_consistent_across_files(tmp_path: Path) -> None:

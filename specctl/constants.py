@@ -23,18 +23,9 @@ EPIC_STATUSES = {
 }
 
 APPROVAL_TRANSITIONS = {
-    "requirements": {
-        "from": ("requirements_draft",),
-        "to": "requirements_approved",
-    },
-    "design": {
-        "from": ("requirements_approved", "design_draft"),
-        "to": "design_approved",
-    },
-    "tasks": {
-        "from": ("design_approved", "tasks_draft"),
-        "to": "tasks_approved",
-    },
+    "requirements": ("requirements_draft", "requirements_approved"),
+    "design": ("design_draft", "design_approved"),
+    "tasks": ("tasks_draft", "tasks_approved"),
 }
 
 RFC_KEYWORDS = {
