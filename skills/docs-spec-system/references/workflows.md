@@ -33,14 +33,15 @@ Acceptance:
 
 ## 2b) Add Contract Change
 
-1. Run `specctl contract create --name "<Contract Change>" --owner <owner> --change-type <type>`.
+1. Run `specctl contract create --name "<Service Standup>" --owner <owner> --change-type service_added`.
+   Use `service_changed` when evolving behavior or interfaces for an existing service.
 2. Fill required sections in `docs/contracts/CC-###-<slug>.md`:
    - `Summary`
    - `Contract Surface`
    - `Change Details`
    - `Compatibility and Migration Guidance`
    - `Downstream Notification Context`
-3. Add downstream target rows with required fields (`repo`, `owner`, `context`, `pr_url`, `state`).
+3. Add downstream target rows in the standard table with required fields (`repo`, `owner`, `context`, `pr_url`, `state`).
 4. Keep `status` synchronized between `docs/CONTRACT_CHANGES.md` and contract-change frontmatter.
 5. Run `specctl check`.
 
