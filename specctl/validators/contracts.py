@@ -178,6 +178,15 @@ def _validate_frontmatter(
                 path=path,
             )
         )
+    if status and status in CONTRACT_CHANGE_STATUSES and status != row.status:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="CONTRACT_STATUS_MISMATCH",
+                message=f"status '{status}' does not match index status '{row.status}'",
+                path=path,
+            )
+        )
 
     change_type = str(frontmatter.get("change_type", ""))
     if change_type and change_type not in CONTRACT_CHANGE_TYPES:
@@ -314,8 +323,13 @@ def _validate_target_gates(path: Path, status: str, targets: list[dict[str, str]
         )
         return messages
 
-    for target in targets:
-        if not target.get("repo", "").strip():
+    has_fully_populated_target = any(
+        target.get("repo", "").strip() and target.get("owner", "").strip() and target.get("context", "").strip()
+        for target in targets
+    )
+    if not has_fully_populated_target:
+        first_target = targets[0]
+        if not first_target.get("repo", "").strip():
             messages.append(
                 LintMessage(
                     severity="ERROR",
@@ -324,8 +338,7 @@ def _validate_target_gates(path: Path, status: str, targets: list[dict[str, str]
                     path=path,
                 )
             )
-            break
-        if not target.get("owner", "").strip():
+        elif not first_target.get("owner", "").strip():
             messages.append(
                 LintMessage(
                     severity="ERROR",
@@ -334,8 +347,7 @@ def _validate_target_gates(path: Path, status: str, targets: list[dict[str, str]
                     path=path,
                 )
             )
-            break
-        if not target.get("context", "").strip():
+        else:
             messages.append(
                 LintMessage(
                     severity="ERROR",
@@ -344,7 +356,6 @@ def _validate_target_gates(path: Path, status: str, targets: list[dict[str, str]
                     path=path,
                 )
             )
-            break
 
     if status in {"published", "closed"}:
         required_states = {"opened", "merged"} if status == "published" else {"merged"}

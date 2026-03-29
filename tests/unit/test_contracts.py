@@ -121,6 +121,104 @@ def test_contract_validator_published_requires_pr_urls(tmp_path: Path) -> None:
     assert any(message.code == "CONTRACT_TARGET_PR_URL_MISSING" for message in messages)
 
 
+def test_contract_validator_approved_requires_only_one_fully_populated_target(tmp_path: Path) -> None:
+    path = tmp_path / "CC-001-contract.md"
+    row = ContractChangeRow(
+        contract_change_id="CC-001",
+        name="ApprovedContract",
+        status="approved",
+        change_type="api_contract_changed",
+        owner="owner@example.com",
+        path="contracts/CC-001-contract.md",
+        aliases="[]",
+    )
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                "doc_type: contract_change",
+                "contract_change_id: CC-001",
+                "name: ApprovedContract",
+                "status: approved",
+                "change_type: api_contract_changed",
+                "owner: owner@example.com",
+                "last_updated: 2026-03-29",
+                "---",
+                "# ApprovedContract",
+                "",
+                "## Summary",
+                "",
+                "## Contract Surface",
+                "",
+                "## Change Details",
+                "",
+                "## Compatibility and Migration Guidance",
+                "",
+                "## Downstream Notification Context",
+                "| repo | owner | context | pr_url | state |",
+                "|------|-------|---------|--------|-------|",
+                "| org/repo-1 | owner | consume endpoint |  |  |",
+                "|  | owner-2 | second target context |  |  |",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    messages, _ = validate_contract_change_file(path, row)
+    assert not any(
+        message.code
+        in {"CONTRACT_TARGET_REPO_MISSING", "CONTRACT_TARGET_OWNER_MISSING", "CONTRACT_TARGET_CONTEXT_MISSING"}
+        for message in messages
+    )
+
+
+def test_contract_validator_reports_status_mismatch_with_index(tmp_path: Path) -> None:
+    path = tmp_path / "CC-001-contract.md"
+    row = ContractChangeRow(
+        contract_change_id="CC-001",
+        name="StatusMismatchContract",
+        status="draft",
+        change_type="api_contract_added",
+        owner="owner@example.com",
+        path="contracts/CC-001-contract.md",
+        aliases="[]",
+    )
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                "doc_type: contract_change",
+                "contract_change_id: CC-001",
+                "name: StatusMismatchContract",
+                "status: published",
+                "change_type: api_contract_added",
+                "owner: owner@example.com",
+                "last_updated: 2026-03-29",
+                "---",
+                "# StatusMismatchContract",
+                "",
+                "## Summary",
+                "",
+                "## Contract Surface",
+                "",
+                "## Change Details",
+                "",
+                "## Compatibility and Migration Guidance",
+                "",
+                "## Downstream Notification Context",
+                "| repo | owner | context | pr_url | state |",
+                "|------|-------|---------|--------|-------|",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    messages, _ = validate_contract_change_file(path, row)
+    assert any(message.code == "CONTRACT_STATUS_MISMATCH" for message in messages)
+
+
 def test_lint_project_collects_contract_change_stats(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
