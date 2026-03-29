@@ -58,8 +58,31 @@ def test_full_feature_lifecycle(tmp_path: Path) -> None:
         == 0
     )
     assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001"]) == 0
     assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "requirements"]) == 0
     _assert_feature_status(root, "F-001", "requirements_approved")
+
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001"]) == 0
+    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "design"]) == 0
+    _assert_feature_status(root, "F-001", "design_approved")
+
+    assert main(["impact", "refresh", "--root", str(root), "--feature-id", "F-001"]) == 0
+    assert main(["impact", "scan", "--root", str(root), "--feature-id", "F-001"]) == 0
+    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "tasks"]) == 0
+    _assert_feature_status(root, "F-001", "tasks_approved")
+
+
+def test_approve_blocked_transition_lists_allowed_from_states(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert main(["feature", "create", "--root", str(root), "--name", "BlockedApprove", "--owner", "owner@example.com"]) == 0
+
+    assert main(["approve", "--root", str(root), "--feature-id", "F-001", "--phase", "design"]) == 1
+    output = capsys.readouterr().out
+    assert "allowed from ['requirements_approved', 'design_draft']" in output
+    assert "found 'requirements_draft'" in output
 
 
 def test_feature_create_keeps_scenario_text_consistent_across_files(tmp_path: Path) -> None:

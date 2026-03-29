@@ -18,7 +18,7 @@ def run(args) -> int:
         print(f"[ERROR] Unknown phase '{args.phase}'")
         return 1
 
-    expected_from, target = APPROVAL_TRANSITIONS[args.phase]
+    allowed_from, target = APPROVAL_TRANSITIONS[args.phase]
 
     for row in rows:
         if row.feature_id != args.feature_id:
@@ -28,9 +28,10 @@ def run(args) -> int:
             for path in missing_files:
                 print(f"[ERROR] Missing required feature file for approval: {path}")
             return 1
-        if row.status != expected_from:
+        if row.status not in allowed_from:
+            allowed_states = ", ".join(f"'{status}'" for status in allowed_from)
             print(
-                f"[ERROR] Transition blocked for {row.feature_id}: expected '{expected_from}', found '{row.status}'"
+                f"[ERROR] Transition blocked for {row.feature_id}: allowed from [{allowed_states}], found '{row.status}'"
             )
             return 1
         impact_messages = build_gate_messages(root, {row.feature_id}, command_name="approve")

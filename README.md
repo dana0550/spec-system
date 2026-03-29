@@ -70,9 +70,25 @@ specctl check --strict
 ## Workflow
 ### Feature workflow (phase-gated)
 1. `requirements_draft -> requirements_approved`
-2. `design_draft -> design_approved`
-3. `tasks_draft -> tasks_approved`
+2. `requirements_approved OR design_draft -> design_approved`
+3. `design_approved OR tasks_draft -> tasks_approved`
 4. `implementing -> verifying -> done`
+
+Before each phase approval, refresh and scan impact for the feature:
+
+```bash
+specctl impact refresh --feature-id F-###
+specctl impact scan --feature-id F-###
+specctl approve --feature-id F-### --phase requirements
+
+specctl impact refresh --feature-id F-###
+specctl impact scan --feature-id F-###
+specctl approve --feature-id F-### --phase design
+
+specctl impact refresh --feature-id F-###
+specctl impact scan --feature-id F-###
+specctl approve --feature-id F-### --phase tasks
+```
 
 Each feature lives in `docs/features/F-###-<slug>/`:
 
