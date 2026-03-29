@@ -42,7 +42,7 @@ def test_lint_detects_untracked_placeholder_marker(tmp_path: Path) -> None:
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
     marker_file = root / "notes.txt"
-    marker_file.write_text("TODO ONESHOT-BLOCKER:B-E001-001\n", encoding="utf-8")
+    marker_file.write_text("TODO ONESHOT-BLOCKER:" + "B-E001-001\n", encoding="utf-8")
     messages, _, _ = lint_project(root)
     assert any(message.code == "ONESHOT_PLACEHOLDER_UNTRACKED" for message in messages)
 

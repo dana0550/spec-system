@@ -1,0 +1,230 @@
+{
+  "features": {
+    "F-001": {
+      "nodes": {
+        "D-F001-001": {
+          "entity_type": "design",
+          "hash": "cfec8c527d6ca041fe352477f54a0084b86999082c01a71e72426de31f72eef0",
+          "line": 9,
+          "path": "docs/features/F-001-repository-self-documentation/design.md",
+          "references": [
+            "R-F001-001"
+          ],
+          "reviewed_upstream_hashes": {
+            "R-F001-001": "2b3663ed77954f348b600b936ac7ce937dbfcbd310aad4cdb4a20dcfe6066aa5"
+          }
+        },
+        "D-F001-002": {
+          "entity_type": "design",
+          "hash": "4966f6bf07e4947fd72d87336e54b08e1d9ad9ccce22f43ddb0bbd69256cb9a7",
+          "line": 10,
+          "path": "docs/features/F-001-repository-self-documentation/design.md",
+          "references": [
+            "R-F001-002"
+          ],
+          "reviewed_upstream_hashes": {
+            "R-F001-002": "1c0f848158726cf6ace5f7d4f6a5d132628d509949e27fa4d330946fa81e1920"
+          }
+        },
+        "D-F001-003": {
+          "entity_type": "design",
+          "hash": "9bbd7dea00c042f4ef88ad5cd0179f4d3acd9843ecac89f64ab6515d9c5c1ac7",
+          "line": 11,
+          "path": "docs/features/F-001-repository-self-documentation/design.md",
+          "references": [
+            "R-F001-003"
+          ],
+          "reviewed_upstream_hashes": {
+            "R-F001-003": "16e16199f73363dd66d334ced62348741c945f2450668e435116c19af4231f91"
+          }
+        },
+        "D-F001-004": {
+          "entity_type": "design",
+          "hash": "0b907f7186ef9e0cd34eff80180e567be9369ad65128c0788660e63c0b3cba75",
+          "line": 12,
+          "path": "docs/features/F-001-repository-self-documentation/design.md",
+          "references": [
+            "R-F001-004"
+          ],
+          "reviewed_upstream_hashes": {
+            "R-F001-004": "ee4520d5f932cd44ce987446fe54729c9ba9adbb36d75052c9632a333f509dd3"
+          }
+        },
+        "EVIDENCE(S-F001-001)": {
+          "entity_type": "evidence",
+          "hash": "c7352097bb4ed8cc6711e3cdb537f7cf849055e2366f3e041aa9ea8499f5961b",
+          "line": 10,
+          "path": "docs/features/F-001-repository-self-documentation/verification.md",
+          "references": [
+            "S-F001-001"
+          ],
+          "reviewed_upstream_hashes": {
+            "S-F001-001": "02ea578eba579173d2f03411719662cd54c5b2666ecaeb2099f2d68e32424fde"
+          }
+        },
+        "EVIDENCE(S-F001-002)": {
+          "entity_type": "evidence",
+          "hash": "a7e3fcdacba97049d0e01c43f683683cb55e466d71144267cca76471a10fce5a",
+          "line": 13,
+          "path": "docs/features/F-001-repository-self-documentation/verification.md",
+          "references": [
+            "S-F001-002"
+          ],
+          "reviewed_upstream_hashes": {
+            "S-F001-002": "233e89c27b2dac359722cb02eb05d4424ebe828002f64e0411a88849e2d4f605"
+          }
+        },
+        "EVIDENCE(S-F001-003)": {
+          "entity_type": "evidence",
+          "hash": "fbdf283c772f04d67ab0bf26ec3f7202498bcad016fe71f449e70736a14b039b",
+          "line": 16,
+          "path": "docs/features/F-001-repository-self-documentation/verification.md",
+          "references": [
+            "S-F001-003"
+          ],
+          "reviewed_upstream_hashes": {
+            "S-F001-003": "0349724a7852541062ab943a871143da09c53870c1237e1bf5e6a0424d96749c"
+          }
+        },
+        "EVIDENCE(S-F001-004)": {
+          "entity_type": "evidence",
+          "hash": "350d5e6aa54d4c57f3ce2a9ea5d3691e46afef4a1f1183d66aec8a9896485c58",
+          "line": 19,
+          "path": "docs/features/F-001-repository-self-documentation/verification.md",
+          "references": [
+            "S-F001-004"
+          ],
+          "reviewed_upstream_hashes": {
+            "S-F001-004": "a7291f229ef53c873599fdab16eb086095cb5de582c24c16023fce8e191b1986"
+          }
+        },
+        "R-F001-001": {
+          "entity_type": "requirement",
+          "hash": "2b3663ed77954f348b600b936ac7ce937dbfcbd310aad4cdb4a20dcfe6066aa5",
+          "line": 11,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "R-F001-002": {
+          "entity_type": "requirement",
+          "hash": "1c0f848158726cf6ace5f7d4f6a5d132628d509949e27fa4d330946fa81e1920",
+          "line": 12,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "R-F001-003": {
+          "entity_type": "requirement",
+          "hash": "16e16199f73363dd66d334ced62348741c945f2450668e435116c19af4231f91",
+          "line": 13,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "R-F001-004": {
+          "entity_type": "requirement",
+          "hash": "ee4520d5f932cd44ce987446fe54729c9ba9adbb36d75052c9632a333f509dd3",
+          "line": 14,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "S-F001-001": {
+          "entity_type": "scenario",
+          "hash": "02ea578eba579173d2f03411719662cd54c5b2666ecaeb2099f2d68e32424fde",
+          "line": 15,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "S-F001-002": {
+          "entity_type": "scenario",
+          "hash": "233e89c27b2dac359722cb02eb05d4424ebe828002f64e0411a88849e2d4f605",
+          "line": 16,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "S-F001-003": {
+          "entity_type": "scenario",
+          "hash": "0349724a7852541062ab943a871143da09c53870c1237e1bf5e6a0424d96749c",
+          "line": 17,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "S-F001-004": {
+          "entity_type": "scenario",
+          "hash": "a7291f229ef53c873599fdab16eb086095cb5de582c24c16023fce8e191b1986",
+          "line": 18,
+          "path": "docs/features/F-001-repository-self-documentation/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "T-F001-001": {
+          "entity_type": "task",
+          "hash": "691155914656a925bf649d22dab2ae6dee06b3781a1341d86e581a78df058a24",
+          "line": 9,
+          "path": "docs/features/F-001-repository-self-documentation/tasks.md",
+          "references": [
+            "D-F001-001",
+            "R-F001-001"
+          ],
+          "reviewed_upstream_hashes": {
+            "D-F001-001": "cfec8c527d6ca041fe352477f54a0084b86999082c01a71e72426de31f72eef0",
+            "R-F001-001": "2b3663ed77954f348b600b936ac7ce937dbfcbd310aad4cdb4a20dcfe6066aa5"
+          }
+        },
+        "T-F001-002": {
+          "entity_type": "task",
+          "hash": "296912dd2cf0c71fd06ab87fb955b6ccd37ed8f39ee0c7ef9e009b1dd209e4ca",
+          "line": 10,
+          "path": "docs/features/F-001-repository-self-documentation/tasks.md",
+          "references": [
+            "D-F001-002",
+            "D-F001-004",
+            "R-F001-002",
+            "R-F001-004"
+          ],
+          "reviewed_upstream_hashes": {
+            "D-F001-002": "4966f6bf07e4947fd72d87336e54b08e1d9ad9ccce22f43ddb0bbd69256cb9a7",
+            "D-F001-004": "0b907f7186ef9e0cd34eff80180e567be9369ad65128c0788660e63c0b3cba75",
+            "R-F001-002": "1c0f848158726cf6ace5f7d4f6a5d132628d509949e27fa4d330946fa81e1920",
+            "R-F001-004": "ee4520d5f932cd44ce987446fe54729c9ba9adbb36d75052c9632a333f509dd3"
+          }
+        },
+        "T-F001-003": {
+          "entity_type": "task",
+          "hash": "232c6aa7ffbfef4ae5dea5d29540a473cb70ca70ffa2708f70c09bf4662fc17e",
+          "line": 11,
+          "path": "docs/features/F-001-repository-self-documentation/tasks.md",
+          "references": [
+            "D-F001-003",
+            "R-F001-003"
+          ],
+          "reviewed_upstream_hashes": {
+            "D-F001-003": "9bbd7dea00c042f4ef88ad5cd0179f4d3acd9843ecac89f64ab6515d9c5c1ac7",
+            "R-F001-003": "16e16199f73363dd66d334ced62348741c945f2450668e435116c19af4231f91"
+          }
+        },
+        "T-F001-004": {
+          "entity_type": "task",
+          "hash": "a21d8b5f8f69ef2c971e28f7073d3180a0b551c8f3076a2e941b6febf9c5f613",
+          "line": 12,
+          "path": "docs/features/F-001-repository-self-documentation/tasks.md",
+          "references": [
+            "D-F001-003",
+            "R-F001-003"
+          ],
+          "reviewed_upstream_hashes": {
+            "D-F001-003": "9bbd7dea00c042f4ef88ad5cd0179f4d3acd9843ecac89f64ab6515d9c5c1ac7",
+            "R-F001-003": "16e16199f73363dd66d334ced62348741c945f2450668e435116c19af4231f91"
+          }
+        }
+      }
+    }
+  },
+  "generated_at": "20260329-081128",
+  "schema_version": "1"
+}

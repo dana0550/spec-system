@@ -62,7 +62,7 @@ def test_blocker_ledger_roundtrips_pipe_characters(tmp_path: Path) -> None:
             "task_id": "T-F001-001",
             "severity": "high",
             "type": "implementation_gap",
-            "placeholder_marker": "ONESHOT-BLOCKER:B-E001-001",
+            "placeholder_marker": "ONESHOT-BLOCKER:" + "B-E001-001",
             "owner": "qa|ops",
             "exit_criteria": "Resolve A | B",
             "status": "open",
@@ -115,7 +115,7 @@ def test_collect_run_stats_aggregates_state_and_blockers(tmp_path: Path) -> None
             "task_id": "",
             "severity": "high",
             "type": "implementation_gap",
-            "placeholder_marker": "ONESHOT-BLOCKER:B-E001-001",
+            "placeholder_marker": "ONESHOT-BLOCKER:" + "B-E001-001",
             "owner": "owner@example.com",
             "exit_criteria": "Fix tests",
             "status": "open",
@@ -130,7 +130,7 @@ def test_collect_run_stats_aggregates_state_and_blockers(tmp_path: Path) -> None
             "task_id": "",
             "severity": "high",
             "type": "implementation_gap",
-            "placeholder_marker": "ONESHOT-BLOCKER:B-E001-002",
+            "placeholder_marker": "ONESHOT-BLOCKER:" + "B-E001-002",
             "owner": "owner@example.com",
             "exit_criteria": "Fix tests",
             "status": "resolved",
@@ -155,7 +155,7 @@ def test_oneshot_id_regex_allows_suffixes_with_more_than_three_digits() -> None:
 
 def test_scan_placeholder_markers_captures_full_blocker_id_suffix(tmp_path: Path) -> None:
     marker_file = tmp_path / "marker.txt"
-    marker_file.write_text("TODO ONESHOT-BLOCKER:B-E001-1000\n", encoding="utf-8")
+    marker_file.write_text("TODO ONESHOT-BLOCKER:" + "B-E001-1000\n", encoding="utf-8")
     hits = scan_placeholder_markers(tmp_path)
     assert len(hits) == 1
     assert hits[0][0] == marker_file
