@@ -9,6 +9,41 @@ from specctl.validators.contracts import validate_contract_change_file
 from specctl.validators.project import lint_project_with_impact
 
 
+def _write_contract_change_doc(path: Path, row: ContractChangeRow, target_rows: list[str]) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                "doc_type: contract_change",
+                f"contract_change_id: {row.contract_change_id}",
+                f"name: {row.name}",
+                f"status: {row.status}",
+                f"change_type: {row.change_type}",
+                f"owner: {row.owner}",
+                "last_updated: 2026-03-29",
+                "---",
+                f"# {row.name}",
+                "",
+                "## Summary",
+                "",
+                "## Contract Surface",
+                "",
+                "## Change Details",
+                "",
+                "## Compatibility and Migration Guidance",
+                "",
+                "## Downstream Notification Context",
+                "| repo | owner | context | pr_url | state |",
+                "|------|-------|---------|--------|-------|",
+                *target_rows,
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_contract_index_roundtrip_and_next_id(tmp_path: Path) -> None:
     index_path = tmp_path / "CONTRACT_CHANGES.md"
     rows = [
@@ -217,6 +252,60 @@ def test_contract_validator_reports_status_mismatch_with_index(tmp_path: Path) -
     )
     messages, _ = validate_contract_change_file(path, row)
     assert any(message.code == "CONTRACT_STATUS_MISMATCH" for message in messages)
+
+
+def test_service_added_gate_failures_match_api_contract_gate_failures(tmp_path: Path) -> None:
+    cases = [
+        ("approved", "|  | owner | context |  |  |", "CONTRACT_TARGET_REPO_MISSING"),
+        ("published", "| org/repo | owner | context |  | opened |", "CONTRACT_TARGET_PR_URL_MISSING"),
+        ("closed", "| org/repo | owner | context | https://example.com/pr/1 | opened |", "CONTRACT_TARGET_STATE_GATE_FAILED"),
+    ]
+    for idx, (status, target_row, expected_code) in enumerate(cases, start=1):
+        for change_type in ("service_added", "api_contract_added"):
+            contract_change_id = f"CC-{idx:03d}"
+            path = tmp_path / f"{contract_change_id}-{change_type}.md"
+            row = ContractChangeRow(
+                contract_change_id=contract_change_id,
+                name=f"{change_type}-{status}",
+                status=status,
+                change_type=change_type,
+                owner="owner@example.com",
+                path=f"contracts/{contract_change_id}-{change_type}.md",
+                aliases="[]",
+            )
+            _write_contract_change_doc(path, row, [target_row])
+            messages, _ = validate_contract_change_file(path, row)
+            assert any(message.code == expected_code for message in messages)
+
+
+def test_service_added_accepts_approved_published_and_closed_targets(tmp_path: Path) -> None:
+    gate_codes = {
+        "CONTRACT_TARGET_REPO_MISSING",
+        "CONTRACT_TARGET_OWNER_MISSING",
+        "CONTRACT_TARGET_CONTEXT_MISSING",
+        "CONTRACT_TARGET_PR_URL_MISSING",
+        "CONTRACT_TARGET_STATE_GATE_FAILED",
+    }
+    cases = [
+        ("approved", "| org/repo | owner | service launch intake |  |  |"),
+        ("published", "| org/repo | owner | service launch intake | https://example.com/pr/2 | opened |"),
+        ("closed", "| org/repo | owner | service launch intake | https://example.com/pr/2 | merged |"),
+    ]
+    for idx, (status, target_row) in enumerate(cases, start=101):
+        contract_change_id = f"CC-{idx:03d}"
+        path = tmp_path / f"{contract_change_id}-service-added.md"
+        row = ContractChangeRow(
+            contract_change_id=contract_change_id,
+            name=f"service-added-{status}",
+            status=status,
+            change_type="service_added",
+            owner="owner@example.com",
+            path=f"contracts/{contract_change_id}-service-added.md",
+            aliases="[]",
+        )
+        _write_contract_change_doc(path, row, [target_row])
+        messages, _ = validate_contract_change_file(path, row)
+        assert not any(message.code in gate_codes for message in messages)
 
 
 def test_lint_project_collects_contract_change_stats(tmp_path: Path) -> None:

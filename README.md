@@ -33,7 +33,7 @@ It keeps planning and execution synchronized with strict traceability and gated 
 
 - `R -> D -> T -> S -> evidence`
 - EARS + RFC requirement quality checks
-- Contract-change notice docs for downstream repository coordination
+- Contract-change docs for downstream repository coordination
 - Epic one-shot runtime with blocker policies and finalize gates
 - Generated product map and traceability reports
 
@@ -99,17 +99,20 @@ Each feature lives in `docs/features/F-###-<slug>/`:
 - `verification.md`
 
 ### Contract change workflow
-Create a contract change artifact when API/service contracts shift and downstream repos need context:
+Create a contract change artifact when launching a new service or evolving existing service/API behavior:
 
 ```bash
 specctl contract create \
-  --name "Payments API v2 Contract Added" \
+  --name "Fraud Scoring Service Standup" \
   --owner team@example.com \
-  --change-type api_contract_added
+  --change-type service_added
 ```
 
 Contract changes live in `docs/contracts/CC-###-<slug>.md` and are tracked in `docs/CONTRACT_CHANGES.md`.
 Statuses are manually edited (`draft|approved|published|closed`) and validated by `specctl check`.
+`--change-type` is required so change intent is always explicit.
+Use `change_type: service_added` for new service launch notifications and `change_type: service_changed` for service interface/behavior evolution.
+Track target-repo PR rollout in the standard `Downstream Notification Context` table (`repo | owner | context | pr_url | state`).
 
 ### Core invariants
 - Requirements use EARS trigger terms and RFC modal keywords.
@@ -198,7 +201,8 @@ specctl init
 
 specctl feature create --name "..." --owner <owner>
 specctl feature check --feature-id F-###
-specctl contract create --name "..." --owner <owner> --change-type <type>
+specctl contract create --name "Fraud Scoring Service Standup" --owner team@example.com --change-type service_added
+# Use --change-type service_changed for service behavior/interface evolution.
 
 specctl impact scan [--feature-id F-###] [--json]
 specctl impact refresh [--feature-id F-###] [--ack-upstream]

@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import yaml
 
 from specctl.cli import main
@@ -183,7 +184,7 @@ def test_feature_name_with_pipe_roundtrips_in_features_index(tmp_path: Path) -> 
     assert rows[0].status == "requirements_draft"
 
 
-def test_contract_create_scaffolds_contract_doc_and_index(tmp_path: Path) -> None:
+def test_contract_create_scaffolds_service_onboarding_doc_and_index(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
@@ -195,9 +196,9 @@ def test_contract_create_scaffolds_contract_doc_and_index(tmp_path: Path) -> Non
                 "--root",
                 str(root),
                 "--name",
-                "Payments API Contract v2",
+                "Fraud Scoring Service Standup",
                 "--change-type",
-                "api_contract_added",
+                "service_added",
                 "--owner",
                 "owner@example.com",
             ]
@@ -205,13 +206,14 @@ def test_contract_create_scaffolds_contract_doc_and_index(tmp_path: Path) -> Non
         == 0
     )
     index_text = (root / "docs" / "CONTRACT_CHANGES.md").read_text(encoding="utf-8")
-    assert "| CC-001 | Payments API Contract v2 | draft | api_contract_added | owner@example.com |" in index_text
+    assert "| CC-001 | Fraud Scoring Service Standup | draft | service_added | owner@example.com |" in index_text
 
     contract_path = next((root / "docs" / "contracts").glob("CC-001-*.md"))
     contract_text = contract_path.read_text(encoding="utf-8")
     assert "doc_type: contract_change" in contract_text
     assert "contract_change_id: CC-001" in contract_text
     assert "status: draft" in contract_text
+    assert "change_type: service_added" in contract_text
     assert "## Downstream Notification Context" in contract_text
     assert main(["feature", "create", "--root", str(root), "--name", "BaselineFeature", "--owner", "owner@example.com"]) == 0
     assert main(["render", "--root", str(root)]) == 0
@@ -222,7 +224,23 @@ def test_check_fails_for_published_contract_without_pr_urls(tmp_path: Path) -> N
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
-    assert main(["contract", "create", "--root", str(root), "--name", "ContractGate", "--owner", "owner@example.com"]) == 0
+    assert (
+        main(
+            [
+                "contract",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ContractGate",
+                "--change-type",
+                "service_added",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
 
     index_path = root / "docs" / "CONTRACT_CHANGES.md"
     index_path.write_text(
@@ -241,6 +259,61 @@ def test_check_fails_for_published_contract_without_pr_urls(tmp_path: Path) -> N
     )
 
     assert main(["check", "--root", str(root)]) == 1
+
+
+def test_check_passes_for_service_added_contract_with_published_gate(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    assert (
+        main(
+            [
+                "contract",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ServiceOnboardingGate",
+                "--change-type",
+                "service_added",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
+
+    index_path = root / "docs" / "CONTRACT_CHANGES.md"
+    index_path.write_text(
+        index_path.read_text(encoding="utf-8").replace("| draft |", "| published |"),
+        encoding="utf-8",
+    )
+    contract_path = next((root / "docs" / "contracts").glob("CC-001-*.md"))
+    contract_path.write_text(
+        contract_path.read_text(encoding="utf-8")
+        .replace("status: draft", "status: published")
+        .replace(
+            "|------|-------|---------|--------|-------|",
+            (
+                "|------|-------|---------|--------|-------|\n"
+                "| org/repo | owner | consume new service | https://example.com/pr/12 | opened |"
+            ),
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["feature", "create", "--root", str(root), "--name", "BaselineFeature", "--owner", "owner@example.com"]) == 0
+    assert main(["render", "--root", str(root)]) == 0
+    assert main(["check", "--root", str(root)]) == 0
+
+
+def test_contract_create_requires_change_type(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    with pytest.raises(SystemExit) as excinfo:
+        main(["contract", "create", "--root", str(root), "--name", "MissingType", "--owner", "owner@example.com"])
+    assert excinfo.value.code == 2
 
 
 def test_feature_create_requires_existing_parent(tmp_path: Path) -> None:
@@ -742,6 +815,7 @@ def test_contract_change_template_contains_required_sections() -> None:
         "doc_type: contract_change",
         "contract_change_id: CC-XXX",
         "status: draft",
+        "change_type: service_added",
         "## Summary",
         "## Contract Surface",
         "## Change Details",

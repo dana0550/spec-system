@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from specctl import __version__
+from specctl.constants import CONTRACT_CHANGE_TYPES
 from specctl.commands import (
     approve,
     check,
@@ -63,7 +64,15 @@ def build_parser() -> argparse.ArgumentParser:
     contract_create_parser.add_argument("--root", default=".")
     contract_create_parser.add_argument("--name", required=True)
     contract_create_parser.add_argument("--contract-change-id")
-    contract_create_parser.add_argument("--change-type", default="api_contract_changed")
+    contract_create_parser.add_argument(
+        "--change-type",
+        choices=sorted(CONTRACT_CHANGE_TYPES),
+        required=True,
+        help=(
+            "Required contract change classification. Use service_added for new service "
+            "standup notifications and service_changed for service interface/behavior evolution."
+        ),
+    )
     contract_create_parser.add_argument("--owner", default="unassigned")
     contract_create_parser.set_defaults(func=contract_create.run)
 

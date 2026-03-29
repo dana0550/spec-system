@@ -165,8 +165,8 @@ Allowed target states:
 
 Allowed change types:
 
-- `service_added`
-- `service_changed`
+- `service_added` (new service standup / launch notification)
+- `service_changed` (service behavior or interface evolution)
 - `api_contract_added`
 - `api_contract_changed`
 - `api_contract_deprecated`
