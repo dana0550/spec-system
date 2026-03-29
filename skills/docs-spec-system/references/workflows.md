@@ -31,6 +31,25 @@ Acceptance:
 - Traceability chain complete.
 - Impact suspects are resolved or explicitly acknowledged.
 
+## 2b) Add Contract Change
+
+1. Run `specctl contract create --name "<Contract Change>" --owner <owner> --change-type <type>`.
+2. Fill required sections in `docs/contracts/CC-###-<slug>.md`:
+   - `Summary`
+   - `Contract Surface`
+   - `Change Details`
+   - `Compatibility and Migration Guidance`
+   - `Downstream Notification Context`
+3. Add downstream target rows with required fields (`repo`, `owner`, `context`, `pr_url`, `state`).
+4. Keep `status` synchronized between `docs/CONTRACT_CHANGES.md` and contract-change frontmatter.
+5. Run `specctl check`.
+
+Acceptance:
+
+- Contract change schema validates.
+- Status gate requirements are met for the selected lifecycle state.
+- No blocking errors from `specctl check`.
+
 ## 3) Add Epic (Agentic Default)
 
 1. Prepare brief with required sections:

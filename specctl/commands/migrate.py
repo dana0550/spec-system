@@ -320,12 +320,28 @@ def _ensure_base_v2_docs(docs: Path) -> None:
             ]
         )
         + "\n",
+        "CONTRACT_CHANGES.md": "\n".join(
+            [
+                "---",
+                "doc_type: contract_change_index",
+                "version: 2.1.0",
+                f"last_synced: {now_date()}",
+                "---",
+                "# Contract Changes Index",
+                "",
+                "| ID | Name | Status | Change Type | Owner | Path | Aliases |",
+                "|----|------|--------|-------------|-------|------|---------|",
+                "",
+            ]
+        )
+        + "\n",
     }
     for name, content in base_files.items():
         path = docs / name
         if not path.exists():
             write_text(path, content)
     (docs / "epics").mkdir(parents=True, exist_ok=True)
+    (docs / "contracts").mkdir(parents=True, exist_ok=True)
 
 
 def _map_legacy_status(status: str) -> str:

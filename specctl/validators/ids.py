@@ -5,6 +5,7 @@ import re
 from specctl.models import FeatureRow, LintMessage
 
 FEATURE_ID_RE = re.compile(r"^F-\d{3}(?:\.\d{2})*$")
+CONTRACT_CHANGE_ID_RE = re.compile(r"^CC-\d{3}$")
 REQ_ID_RE = re.compile(r"\bR-F\d{3}(?:\.\d{2})*-\d{3}\b")
 SCENARIO_ID_RE = re.compile(r"\bS-F\d{3}(?:\.\d{2})*-\d{3}\b")
 DESIGN_ID_RE = re.compile(r"\bD-F\d{3}(?:\.\d+)*-\d{3,}\b")

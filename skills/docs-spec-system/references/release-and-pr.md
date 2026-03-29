@@ -18,7 +18,7 @@ Blocking condition:
 ## PR Assembly
 
 1. Use `assets/docs-system-pr-template.md`.
-2. Include all impacted IDs (`E`, `F`, `R`, `D`, `T`, `S`).
+2. Include all impacted IDs (`CC`, `E`, `F`, `R`, `D`, `T`, `S`).
 3. Include phase approvals performed.
 4. Include migration notes (if `migrate-v1-to-v2` was used).
 5. Include traceability and verification evidence links.
@@ -29,6 +29,7 @@ Blocking condition:
 
 - No placeholders in PR template.
 - `specctl check` passes.
+- Contract-change status gates (if `CC-*` touched) pass under `specctl check`.
 - `specctl impact scan` reports zero open suspects.
 - If Codex assets are tracked, `specctl codex check` passes.
 - For epic runs, `specctl oneshot finalize` succeeded with zero open blockers.
@@ -53,4 +54,4 @@ Automation note:
 
 ## Suggested PR Title
 
-`docs: spec system v2 update [F-IDs]`
+`docs: spec system v2 update [CC/F-IDs]`

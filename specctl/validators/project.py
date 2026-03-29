@@ -3,31 +3,35 @@ from __future__ import annotations
 from pathlib import Path
 
 from specctl.constants import REQUIRED_DOC_FILES
+from specctl.contract_index import read_contract_change_rows
 from specctl.feature_index import read_feature_rows
 from specctl.impact import build_lint_messages, scan_impact
-from specctl.models import FeatureRow, ImpactScanResult, LintMessage, OneShotStats, TraceabilityStats
+from specctl.models import ContractChangeStats, FeatureRow, ImpactScanResult, LintMessage, OneShotStats, TraceabilityStats
+from specctl.validators.contracts import validate_contract_change_file, validate_contract_change_rows
 from specctl.validators.epics import validate_epics
 from specctl.validators.ids import validate_feature_ids
 from specctl.validators.lifecycle import validate_statuses
 from specctl.validators.requirements import validate_requirements_file
 from specctl.validators.traceability import validate_feature_traceability
 
+
 def lint_project(root: Path) -> tuple[list[LintMessage], TraceabilityStats, OneShotStats]:
-    messages, stats, oneshot_stats, _ = lint_project_with_impact(root)
+    messages, stats, oneshot_stats, _, _ = lint_project_with_impact(root)
     return messages, stats, oneshot_stats
 
 
 def lint_project_with_impact(
     root: Path,
-) -> tuple[list[LintMessage], TraceabilityStats, OneShotStats, ImpactScanResult | None]:
+) -> tuple[list[LintMessage], TraceabilityStats, OneShotStats, ImpactScanResult | None, ContractChangeStats]:
     messages: list[LintMessage] = []
     stats = TraceabilityStats()
     oneshot_stats = OneShotStats()
+    contract_stats = ContractChangeStats()
 
     docs_dir = root / "docs"
     if not docs_dir.exists():
         messages.append(LintMessage("ERROR", "DOCS_MISSING", "docs/ directory is missing", docs_dir))
-        return messages, stats, oneshot_stats, None
+        return messages, stats, oneshot_stats, None, contract_stats
 
     for required in sorted(REQUIRED_DOC_FILES):
         required_path = docs_dir / required
@@ -77,6 +81,47 @@ def lint_project_with_impact(
                 )
         messages.extend(validate_feature_hierarchy(rows, features_index_path))
 
+    contract_index_path = docs_dir / "CONTRACT_CHANGES.md"
+    contract_rows = read_contract_change_rows(contract_index_path)
+    messages.extend(validate_contract_change_rows(contract_rows, contract_index_path))
+    contracts_root = docs_dir / "contracts"
+    if not contracts_root.exists() and contract_rows:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="CONTRACTS_DIR_MISSING",
+                message="docs/contracts directory is missing",
+                path=contracts_root,
+            )
+        )
+
+    expected_contract_paths: set[Path] = set()
+    for row in contract_rows:
+        contract_path = docs_dir / row.path
+        expected_contract_paths.add(contract_path.resolve())
+        contract_messages, per_row_stats = validate_contract_change_file(contract_path, row)
+        messages.extend(contract_messages)
+        contract_stats.contract_changes_total += per_row_stats.contract_changes_total
+        contract_stats.contract_changes_draft += per_row_stats.contract_changes_draft
+        contract_stats.contract_changes_approved += per_row_stats.contract_changes_approved
+        contract_stats.contract_changes_published += per_row_stats.contract_changes_published
+        contract_stats.contract_changes_closed += per_row_stats.contract_changes_closed
+        contract_stats.contract_targets_total += per_row_stats.contract_targets_total
+        contract_stats.contract_targets_with_pr_url += per_row_stats.contract_targets_with_pr_url
+        contract_stats.contract_targets_merged += per_row_stats.contract_targets_merged
+
+    if contracts_root.exists():
+        for contract_path in sorted(path for path in contracts_root.iterdir() if path.is_file() and path.suffix == ".md"):
+            if contract_path.resolve() not in expected_contract_paths:
+                messages.append(
+                    LintMessage(
+                        severity="ERROR",
+                        code="CONTRACT_PATH_ORPHAN",
+                        message=f"Contract file has no matching CONTRACT_CHANGES.md row: {contract_path.name}",
+                        path=contract_path,
+                    )
+                )
+
     epic_messages, oneshot_stats = validate_epics(root, rows)
     messages.extend(epic_messages)
 
@@ -90,7 +135,7 @@ def lint_project_with_impact(
                 path=features_root,
             )
         )
-        return messages, stats, oneshot_stats, None
+        return messages, stats, oneshot_stats, None, contract_stats
 
     expected_feature_dirs: set[Path] = set()
     for row in rows:
@@ -132,7 +177,7 @@ def lint_project_with_impact(
     impact_scan = scan_impact(root)
     messages.extend(build_lint_messages(root, impact_scan))
 
-    return messages, stats, oneshot_stats, impact_scan
+    return messages, stats, oneshot_stats, impact_scan, contract_stats
 
 
 def validate_feature_hierarchy(rows: list[FeatureRow], features_index_path: Path) -> list[LintMessage]:

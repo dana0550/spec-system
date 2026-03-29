@@ -8,7 +8,7 @@ from specctl.validators.project import lint_project_with_impact
 
 def run(args) -> int:
     root = project_root(args.root)
-    messages, stats, oneshot_stats, impact_scan = lint_project_with_impact(root)
+    messages, stats, oneshot_stats, impact_scan, contract_stats = lint_project_with_impact(root)
     errors = sum(1 for m in messages if m.severity == "ERROR")
     warnings = sum(1 for m in messages if m.severity == "WARN")
 
@@ -30,6 +30,14 @@ def run(args) -> int:
         "placeholder_leakage_count": oneshot_stats.placeholder_leakage_count,
         "impact_suspects_open": len(impact_scan.suspects) if impact_scan is not None else 0,
         "impact_features_tracked": impact_scan.features_tracked if impact_scan is not None else 0,
+        "contract_changes_total": contract_stats.contract_changes_total,
+        "contract_changes_draft": contract_stats.contract_changes_draft,
+        "contract_changes_approved": contract_stats.contract_changes_approved,
+        "contract_changes_published": contract_stats.contract_changes_published,
+        "contract_changes_closed": contract_stats.contract_changes_closed,
+        "contract_targets_total": contract_stats.contract_targets_total,
+        "contract_targets_with_pr_url": contract_stats.contract_targets_with_pr_url,
+        "contract_targets_merged": contract_stats.contract_targets_merged,
     }
 
     if args.json:

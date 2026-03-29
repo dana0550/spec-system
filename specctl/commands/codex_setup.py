@@ -14,6 +14,7 @@ Use `specctl` as the source of truth for spec operations in this repository.
 ## Workflow
 
 - Run spec changes through phase-gated docs workflow (`requirements -> design -> tasks -> verification`).
+- Run contract-change notifications through `CONTRACT_CHANGES.md` + `docs/contracts/CC-###-*.md`.
 - Keep strict `R -> D -> T -> S -> evidence` traceability.
 - For epics, run one-shot lifecycle (`run -> check -> finalize`) with blocker closure.
 - Prefer agentic epic planning for new epics and deterministic mode only when explicitly requested.

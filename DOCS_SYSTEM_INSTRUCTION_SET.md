@@ -14,6 +14,6 @@ Use the Spec System v2 interfaces instead:
 - Rules: `skills/docs-spec-system/references/spec-system-rules.md`
 - Workflows: `skills/docs-spec-system/references/workflows.md`
 - Release/PR flow: `skills/docs-spec-system/references/release-and-pr.md`
-- CLI: `specctl` (`init`, `feature create`, `feature check`, `epic create`, `epic check`, `epic migrate-agentic`, `codex setup`, `codex check`, `oneshot run`, `oneshot resume`, `oneshot check`, `oneshot finalize`, `oneshot report`, `impact scan`, `impact refresh`, `lint`, `render`, `check`, `approve`, `migrate-v1-to-v2`, `report`)
+- CLI: `specctl` (`init`, `feature create`, `feature check`, `contract create`, `epic create`, `epic check`, `epic migrate-agentic`, `codex setup`, `codex check`, `oneshot run`, `oneshot resume`, `oneshot check`, `oneshot finalize`, `oneshot report`, `impact scan`, `impact refresh`, `lint`, `render`, `check`, `approve`, `migrate-v1-to-v2`, `report`)
 
 Legacy script-driven interfaces are unsupported.

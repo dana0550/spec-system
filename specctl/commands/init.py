@@ -9,10 +9,11 @@ def run(args) -> int:
     root = Path(args.root).resolve()
     docs = root / "docs"
     features = docs / "features"
+    contracts = docs / "contracts"
     epics = docs / "epics"
     decisions = docs / "DECISIONS"
 
-    for directory in [docs, features, epics, decisions]:
+    for directory in [docs, features, contracts, epics, decisions]:
         directory.mkdir(parents=True, exist_ok=True)
 
     write_text(
@@ -67,6 +68,24 @@ def run(args) -> int:
                 "",
                 "| ID | Name | Status | Parent ID | Spec Path | Owner | Aliases |",
                 "|----|------|--------|-----------|-----------|-------|---------|",
+            ]
+        )
+        + "\n",
+    )
+
+    write_text(
+        docs / "CONTRACT_CHANGES.md",
+        "\n".join(
+            [
+                "---",
+                "doc_type: contract_change_index",
+                "version: 2.4.0",
+                f"last_synced: {now_date()}",
+                "---",
+                "# Contract Changes Index",
+                "",
+                "| ID | Name | Status | Change Type | Owner | Path | Aliases |",
+                "|----|------|--------|-------------|-------|------|---------|",
             ]
         )
         + "\n",

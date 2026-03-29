@@ -33,6 +33,7 @@ It keeps planning and execution synchronized with strict traceability and gated 
 
 - `R -> D -> T -> S -> evidence`
 - EARS + RFC requirement quality checks
+- Contract-change notice docs for downstream repository coordination
 - Epic one-shot runtime with blocker policies and finalize gates
 - Generated product map and traceability reports
 
@@ -96,6 +97,19 @@ Each feature lives in `docs/features/F-###-<slug>/`:
 - `design.md`
 - `tasks.md`
 - `verification.md`
+
+### Contract change workflow
+Create a contract change artifact when API/service contracts shift and downstream repos need context:
+
+```bash
+specctl contract create \
+  --name "Payments API v2 Contract Added" \
+  --owner team@example.com \
+  --change-type api_contract_added
+```
+
+Contract changes live in `docs/contracts/CC-###-<slug>.md` and are tracked in `docs/CONTRACT_CHANGES.md`.
+Statuses are manually edited (`draft|approved|published|closed`) and validated by `specctl check`.
 
 ### Core invariants
 - Requirements use EARS trigger terms and RFC modal keywords.
@@ -184,6 +198,7 @@ specctl init
 
 specctl feature create --name "..." --owner <owner>
 specctl feature check --feature-id F-###
+specctl contract create --name "..." --owner <owner> --change-type <type>
 
 specctl impact scan [--feature-id F-###] [--json]
 specctl impact refresh [--feature-id F-###] [--ack-upstream]
@@ -214,12 +229,14 @@ Run `specctl --help` for the complete command surface.
 docs/
   MASTER_SPEC.md
   FEATURES.md
+  CONTRACT_CHANGES.md
   EPICS.md
   PRODUCT_MAP.md
   TRACEABILITY.md
   STEERING.md
   DECISIONS/
   features/
+  contracts/
   epics/
 skills/
   docs-spec-system/
