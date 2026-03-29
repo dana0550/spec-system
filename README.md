@@ -110,6 +110,7 @@ specctl contract create \
 
 Contract changes live in `docs/contracts/CC-###-<slug>.md` and are tracked in `docs/CONTRACT_CHANGES.md`.
 Statuses are manually edited (`draft|approved|published|closed`) and validated by `specctl check`.
+`--change-type` is required so change intent is always explicit.
 Use `change_type: service_added` for new service launch notifications and `change_type: service_changed` for service interface/behavior evolution.
 Track target-repo PR rollout in the standard `Downstream Notification Context` table (`repo | owner | context | pr_url | state`).
 

@@ -33,7 +33,7 @@ def run(args) -> int:
     else:
         contract_change_id = next_contract_change_id(rows)
 
-    change_type = (args.change_type or "service_added").strip()
+    change_type = (args.change_type or "").strip()
     if change_type not in CONTRACT_CHANGE_TYPES:
         allowed = ", ".join(sorted(CONTRACT_CHANGE_TYPES))
         print(f"[ERROR] Invalid change type '{change_type}'. Allowed: {allowed}")

@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import yaml
 
 from specctl.cli import main
@@ -223,7 +224,23 @@ def test_check_fails_for_published_contract_without_pr_urls(tmp_path: Path) -> N
     root = tmp_path / "workspace"
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
-    assert main(["contract", "create", "--root", str(root), "--name", "ContractGate", "--owner", "owner@example.com"]) == 0
+    assert (
+        main(
+            [
+                "contract",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "ContractGate",
+                "--change-type",
+                "service_added",
+                "--owner",
+                "owner@example.com",
+            ]
+        )
+        == 0
+    )
 
     index_path = root / "docs" / "CONTRACT_CHANGES.md"
     index_path.write_text(
@@ -288,6 +305,15 @@ def test_check_passes_for_service_added_contract_with_published_gate(tmp_path: P
     assert main(["feature", "create", "--root", str(root), "--name", "BaselineFeature", "--owner", "owner@example.com"]) == 0
     assert main(["render", "--root", str(root)]) == 0
     assert main(["check", "--root", str(root)]) == 0
+
+
+def test_contract_create_requires_change_type(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    with pytest.raises(SystemExit) as excinfo:
+        main(["contract", "create", "--root", str(root), "--name", "MissingType", "--owner", "owner@example.com"])
+    assert excinfo.value.code == 2
 
 
 def test_feature_create_requires_existing_parent(tmp_path: Path) -> None:

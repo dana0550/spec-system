@@ -67,10 +67,10 @@ def build_parser() -> argparse.ArgumentParser:
     contract_create_parser.add_argument(
         "--change-type",
         choices=sorted(CONTRACT_CHANGE_TYPES),
-        default="service_added",
+        required=True,
         help=(
-            "Contract change classification. Use service_added for new service standup "
-            "notifications and service_changed for service interface/behavior evolution."
+            "Required contract change classification. Use service_added for new service "
+            "standup notifications and service_changed for service interface/behavior evolution."
         ),
     )
     contract_create_parser.add_argument("--owner", default="unassigned")

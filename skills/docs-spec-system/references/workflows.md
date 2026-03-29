@@ -35,6 +35,7 @@ Acceptance:
 
 1. Run `specctl contract create --name "<Service Standup>" --owner <owner> --change-type service_added`.
    Use `service_changed` when evolving behavior or interfaces for an existing service.
+   `--change-type` is required for explicit classification.
 2. Fill required sections in `docs/contracts/CC-###-<slug>.md`:
    - `Summary`
    - `Contract Surface`
