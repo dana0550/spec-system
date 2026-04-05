@@ -78,6 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
     epic_create_parser.add_argument("--brief", required=True)
     epic_create_parser.add_argument("--feature-id")
     epic_create_parser.add_argument("--runner", choices=sorted(ONESHOT_RUNNERS), default="codex")
+    epic_create_parser.add_argument("--autoresearch-repo-path")
+    epic_create_parser.add_argument("--autoresearch-run-tag")
+    epic_create_parser.add_argument("--autoresearch-base-ref")
+    epic_create_parser.add_argument("--autoresearch-cache-dir")
     epic_create_parser.set_defaults(func=epic_create.run)
 
     epic_check_parser = epic_sub.add_parser("check", help="Validate one epic and its one-shot artifacts")

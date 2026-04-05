@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from specctl.autoresearch import prepare_autoresearch_context
 from specctl.commands.oneshot_common import load_epic_and_contract, write_run_state
 from specctl.commands.oneshot_runtime import (
     CheckpointExecutionConfig,
@@ -47,6 +48,17 @@ def run(args) -> int:
         "checkpoint_status": {cp["checkpoint_id"]: "pending" for cp in checkpoints},
     }
     write_run_state(run_dir, state)
+    if runner == "autoresearch":
+        try:
+            state["runner_context"] = prepare_autoresearch_context(root, contract, run_dir)
+        except ValueError as exc:
+            state["status"] = "blocked"
+            write_run_state(run_dir, state)
+            print(f"[ERROR] {exc}")
+            print(f"Started one-shot run {run_id} for epic {epic.epic_id}")
+            print(f"Run status: {state['status']}")
+            return 1
+        write_run_state(run_dir, state)
 
     hard_stop_types = set(contract.get("blocker_policy", {}).get("hard_stop_types", []))
     repair_policy = contract.get("repair_policy", {})

@@ -40,6 +40,7 @@ Acceptance:
    - `Constraints`
    - `Non-Goals`
 2. Run `specctl epic create --name "<Epic>" --owner <owner> --brief <brief.md> [--runner codex|claude|autoresearch]`.
+   If `--runner autoresearch`, also pass `--autoresearch-repo-path <path>` and `--autoresearch-run-tag <tag>`.
 3. Confirm epic scaffolding:
    - root feature created
    - child features generated from journeys/outcomes
@@ -58,6 +59,7 @@ Acceptance:
 ## 4) Epic One-Shot Execution
 
 1. Start run: `specctl oneshot run --epic-id <E-ID> [--runner codex|claude|autoresearch]`.
+   For `autoresearch`, ensure the configured repo is a local checkout of `karpathy/autoresearch`, the cache dir exists, and `runner_command` launches an outer agent CLI against the prepared worktree `program.md`.
 2. Validate contract/run artifacts: `specctl oneshot check --epic-id <E-ID> [--run-id <RUN-ID>]`.
 3. If needed, continue run: `specctl oneshot resume --epic-id <E-ID> --run-id <RUN-ID>`.
 4. Close blockers and remove placeholders.

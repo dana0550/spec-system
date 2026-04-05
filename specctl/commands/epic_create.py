@@ -63,6 +63,12 @@ def run(args) -> int:
     owner = args.owner or "unassigned"
     include_ui = needs_ui_components(brief_text)
     components = default_components(include_ui)
+    if args.runner == "autoresearch":
+        if not args.autoresearch_repo_path or not args.autoresearch_run_tag:
+            print(
+                "[ERROR] runner 'autoresearch' requires --autoresearch-repo-path and --autoresearch-run-tag"
+            )
+            return 1
 
     working_rows: list[FeatureRow] = list(feature_rows)
     created_rows: list[FeatureRow] = []
@@ -212,6 +218,16 @@ def run(args) -> int:
             "required_validation_commands": ["python -m specctl.cli lint --root ."],
         },
     }
+    if args.runner == "autoresearch":
+        autoresearch_payload = {
+            "repo_path": args.autoresearch_repo_path,
+            "run_tag": args.autoresearch_run_tag,
+        }
+        if args.autoresearch_base_ref:
+            autoresearch_payload["base_ref"] = args.autoresearch_base_ref
+        if args.autoresearch_cache_dir:
+            autoresearch_payload["cache_dir"] = args.autoresearch_cache_dir
+        oneshot_payload["autoresearch"] = autoresearch_payload
     dump_json_document(epic_dir / "oneshot.yaml", oneshot_payload)
 
     dump_json_document(

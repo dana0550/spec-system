@@ -5,6 +5,7 @@
     "F-XXX"
   ],
   "runner": "codex",
+  "runner_command": "",
   "checkpoint_graph": [
     {
       "checkpoint_id": "C-EXXX-001",
@@ -23,6 +24,12 @@
   "repair_policy": {
     "max_retries_per_checkpoint": 2,
     "commands": []
+  },
+  "autoresearch": {
+    "repo_path": "/absolute/path/to/autoresearch",
+    "run_tag": "apr5",
+    "base_ref": "master",
+    "cache_dir": "~/.cache/autoresearch"
   },
   "blocker_policy": {
     "hard_stop_types": [

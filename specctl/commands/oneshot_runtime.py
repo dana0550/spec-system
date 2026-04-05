@@ -5,6 +5,7 @@ import shlex
 from pathlib import Path
 from typing import Any
 
+from specctl.autoresearch import build_autoresearch_program, expand_autoresearch_command, sync_autoresearch_program
 from specctl.commands.oneshot_common import append_event, run_shell
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import now_date, write_text
@@ -52,26 +53,29 @@ def process_checkpoint(
     validation_commands = checkpoint.get("validation_commands", contract.get("validation_commands", []))
     if not isinstance(validation_commands, list):
         validation_commands = []
+    runner = str(state.get("runner", "codex"))
+    runner_context = state.get("runner_context")
 
     prompt_path = run_dir / f"{checkpoint_id}{config.prompt_suffix}"
-    prompt_text = build_scoped_prompt(
-        epic.epic_id,
-        state["run_id"],
-        checkpoint,
-        str(state.get("runner", "codex")),
-        validation_commands,
-    )
+    prompt_text = build_scoped_prompt(epic.epic_id, state["run_id"], checkpoint, runner, validation_commands, runner_context)
     write_text(prompt_path, prompt_text)
+    if runner == "autoresearch" and isinstance(runner_context, dict):
+        sync_autoresearch_program(runner_context, prompt_text)
 
     runner_command = checkpoint.get("runner_command") or contract.get("runner_command")
     if isinstance(runner_command, str) and runner_command.strip():
-        rc, output = run_shell(runner_command, root)
+        command_root = root
+        expanded_command = runner_command
+        if runner == "autoresearch" and isinstance(runner_context, dict):
+            expanded_command = expand_autoresearch_command(runner_command, runner_context)
+            command_root = Path(runner_context["worktree_path"])
+        rc, output = run_shell(expanded_command, command_root)
         append_event(
             run_dir,
             {
                 "type": config.runner_event_type,
                 "checkpoint_id": checkpoint_id,
-                "command": runner_command,
+                "command": expanded_command,
                 "prompt_path": str(prompt_path),
                 "rc": rc,
                 "output": output[-3000:],
@@ -86,7 +90,7 @@ def process_checkpoint(
                 "command": "",
                 "prompt_path": str(prompt_path),
                 "rc": 0,
-                "output": config.runner_fallback_output,
+                "output": fallback_output(config.runner_fallback_output, runner, runner_context),
             },
         )
 
@@ -303,7 +307,17 @@ def build_scoped_prompt(
     checkpoint: dict,
     runner: str,
     validation_commands: list[str],
+    runner_context: dict[str, str] | None = None,
 ) -> str:
+    if runner == "autoresearch" and isinstance(runner_context, dict):
+        return build_autoresearch_program(
+            epic_id=epic_id,
+            run_id=run_id,
+            checkpoint=checkpoint,
+            validation_commands=validation_commands,
+            context=runner_context,
+        )
+
     lines = [
         "# One-Shot Checkpoint Prompt",
         "",
@@ -324,19 +338,6 @@ def build_scoped_prompt(
     else:
         lines.append("- No validation commands configured.")
 
-    if runner == "autoresearch":
-        lines.extend(
-            [
-                "",
-                "## Autoresearch Mode",
-                "- Treat this checkpoint as a measured experiment loop, not a single blind edit.",
-                "- Establish the current baseline before making a scoped change.",
-                "- Make one coherent improvement at a time and keep only changes that improve the measured outcome.",
-                "- Revert or discard regressions rather than compounding them into the branch.",
-                "- Record the winning outcome and the evidence needed for downstream verification.",
-            ]
-        )
-
     lines.extend(
         [
             "",
@@ -348,3 +349,12 @@ def build_scoped_prompt(
         ]
     )
     return "\n".join(lines)
+
+
+def fallback_output(message: str, runner: str, runner_context: dict[str, str] | None) -> str:
+    if runner != "autoresearch" or not isinstance(runner_context, dict):
+        return message
+    return (
+        f"{message} Prepared exact karpathy/autoresearch worktree at {runner_context['worktree_path']} "
+        f"on branch {runner_context['branch']} with program {runner_context['program_path']}."
+    )

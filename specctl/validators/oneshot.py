@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from specctl.autoresearch import validate_autoresearch_contract
 from specctl.constants import ONESHOT_RUNNERS
 from specctl.models import EpicRow, FeatureRow, LintMessage
 from specctl.oneshot_utils import HARD_STOP_TYPES, load_json_document, parse_blockers, parse_task_ids
@@ -73,6 +74,8 @@ def validate_oneshot_contract(
                 path=oneshot_path,
             )
         )
+    elif runner == "autoresearch":
+        messages.extend(validate_autoresearch_contract(payload, oneshot_path))
 
     scope_feature_ids = payload.get("scope_feature_ids", [])
     if not isinstance(scope_feature_ids, list) or not scope_feature_ids:

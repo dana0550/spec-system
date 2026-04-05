@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 
 from specctl.cli import main
+from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.oneshot_utils import needs_ui_components
 from specctl.validators.project import lint_project
 
@@ -41,7 +42,7 @@ def test_lint_detects_untracked_placeholder_marker(tmp_path: Path) -> None:
     root.mkdir()
     assert main(["init", "--root", str(root)]) == 0
     marker_file = root / "notes.txt"
-    marker_file.write_text("TODO ONESHOT-BLOCKER:B-E001-001\n", encoding="utf-8")
+    marker_file.write_text(f"TODO {ONESHOT_PLACEHOLDER_PREFIX}B-E001-001\n", encoding="utf-8")
     messages, _, _ = lint_project(root)
     assert any(message.code == "ONESHOT_PLACEHOLDER_UNTRACKED" for message in messages)
 

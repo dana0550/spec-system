@@ -132,7 +132,9 @@ Epic contract:
 
 - `brief -> decomposition -> oneshot contract -> run checkpoints -> blocker ledger -> finalize evidence`
 - `oneshot.yaml.runner` MUST be one of `codex`, `claude`, or `autoresearch`
-- `autoresearch` runner prompts are emitted as checkpoint `*.program.md` artifacts
+- `runner: autoresearch` MUST include an `autoresearch` object with `repo_path` and `run_tag`
+- `runner: autoresearch` prepares an isolated git worktree and emits checkpoint `*.program.md` artifacts that are synchronized into the exact `karpathy/autoresearch` workspace as `program.md`
+- `runner_command` MAY include `{autoresearch_*}` placeholders that resolve to the prepared repo/worktree/program/results paths
 - Epic one-shot finalize requires:
   - zero open blockers
   - zero unresolved `ONESHOT-BLOCKER:*` markers

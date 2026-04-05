@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from specctl.autoresearch import load_autoresearch_context, prepare_autoresearch_context
 from specctl.commands.oneshot_common import (
     load_epic_and_contract,
     read_run_state,
@@ -48,6 +49,15 @@ def run(args) -> int:
     if status not in {"running", "stabilizing"}:
         print(f"[ERROR] Run {args.run_id} is not resumable from status '{state.get('status')}'")
         return 1
+    if state.get("runner", contract.get("runner", "codex")) == "autoresearch":
+        context = load_autoresearch_context(run_dir)
+        if context is None:
+            try:
+                context = prepare_autoresearch_context(root, contract, run_dir)
+            except ValueError as exc:
+                print(f"[ERROR] {exc}")
+                return 1
+        state["runner_context"] = context
 
     checkpoints = contract.get("checkpoint_graph", [])
     hard_stop_types = set(contract.get("blocker_policy", {}).get("hard_stop_types", []))

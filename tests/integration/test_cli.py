@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections import Counter
 import json
+import os
 import re
 import shutil
 from pathlib import Path
+import subprocess
 
 import yaml
 
@@ -25,6 +27,35 @@ def copy_fixture(tmp_path: Path, fixture_root: Path) -> Path:
     target = tmp_path / "repo"
     shutil.copytree(fixture_root, target)
     return target
+
+
+def create_autoresearch_repo(tmp_path: Path) -> tuple[Path, Path]:
+    repo = tmp_path / "autoresearch"
+    repo.mkdir()
+    (repo / "README.md").write_text("# autoresearch\n", encoding="utf-8")
+    (repo / "prepare.py").write_text("print('prepare')\n", encoding="utf-8")
+    (repo / "program.md").write_text("# baseline program\n", encoding="utf-8")
+    (repo / "pyproject.toml").write_text("[project]\nname='autoresearch'\nversion='0.1.0'\n", encoding="utf-8")
+    (repo / "train.py").write_text("print('train')\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-b", "master", str(repo)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Test",
+        "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "Test",
+        "GIT_COMMITTER_EMAIL": "test@example.com",
+    }
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-m", "init"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    cache_dir = tmp_path / ".cache" / "autoresearch"
+    cache_dir.mkdir(parents=True)
+    return repo, cache_dir
 
 
 def test_init_creates_valid_structure(tmp_path: Path) -> None:
@@ -90,6 +121,7 @@ def test_feature_create_keeps_scenario_text_consistent_across_files(tmp_path: Pa
 def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
+    autoresearch_repo, cache_dir = create_autoresearch_repo(tmp_path)
     assert main(["init", "--root", str(root)]) == 0
     brief = root / "brief.md"
     brief.write_text(
@@ -129,6 +161,12 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
                 str(brief),
                 "--runner",
                 "autoresearch",
+                "--autoresearch-repo-path",
+                str(autoresearch_repo),
+                "--autoresearch-run-tag",
+                "apr5",
+                "--autoresearch-cache-dir",
+                str(cache_dir),
             ]
         )
         == 0
@@ -137,7 +175,13 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
     epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
     payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     assert payload["runner"] == "autoresearch"
+    assert payload["autoresearch"]["repo_path"] == str(autoresearch_repo)
     payload["validation_commands"] = ['python -c "print(\'ok\')"']
+    payload["runner_command"] = (
+        "python -c \"from pathlib import Path; "
+        "Path(r'{autoresearch_worktree}').joinpath('runner.txt').write_text("
+        "Path(r'{autoresearch_program_path}').read_text())\""
+    )
     (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
@@ -146,10 +190,71 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
     program_prompt = next(run_dir.glob("*.program.md"))
     prompt_text = program_prompt.read_text(encoding="utf-8")
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    context = state["runner_context"]
+    worktree = Path(context["worktree_path"])
+    runner_output = (worktree / "runner.txt").read_text(encoding="utf-8")
+    branch = subprocess.run(
+        ["git", "-C", str(worktree), "branch", "--show-current"],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    ).stdout.strip()
 
     assert state["runner"] == "autoresearch"
-    assert "## Autoresearch Mode" in prompt_text
-    assert "measured experiment loop" in prompt_text
+    assert branch == "autoresearch/apr5"
+    assert (worktree / "results.tsv").exists()
+    assert "exact karpathy/autoresearch repository" in prompt_text
+    assert "Only edit `train.py`." in prompt_text
+    assert runner_output == (worktree / "program.md").read_text(encoding="utf-8")
+
+
+def test_epic_create_rejects_autoresearch_runner_without_repo_inputs(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief = root / "brief.md"
+    brief.write_text(
+        "\n".join(
+            [
+                "## Vision",
+                "- Improve delivery reliability.",
+                "",
+                "## Outcomes",
+                "- Reduce regressions.",
+                "",
+                "## User Journeys",
+                "- Operator checks a generated program.",
+                "",
+                "## Constraints",
+                "- Keep compatibility.",
+                "",
+                "## Non-Goals",
+                "- No billing changes.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AutoresearchEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief),
+                "--runner",
+                "autoresearch",
+            ]
+        )
+        == 1
+    )
 
 
 def test_design_and_tasks_approvals_sync_frontmatter(tmp_path: Path) -> None:

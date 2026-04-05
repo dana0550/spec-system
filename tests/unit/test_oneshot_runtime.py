@@ -15,6 +15,7 @@ from specctl.commands.oneshot_runtime import (
     prompt_suffix_for_runner,
     run_validation_group,
 )
+from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, parse_task_ids, scan_placeholder_markers
 from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
@@ -72,7 +73,7 @@ def test_blocker_ledger_roundtrips_pipe_characters(tmp_path: Path) -> None:
             "task_id": "T-F001-001",
             "severity": "high",
             "type": "implementation_gap",
-            "placeholder_marker": "ONESHOT-BLOCKER:B-E001-001",
+            "placeholder_marker": f"{ONESHOT_PLACEHOLDER_PREFIX}B-E001-001",
             "owner": "qa|ops",
             "exit_criteria": "Resolve A | B",
             "status": "open",
@@ -125,7 +126,7 @@ def test_collect_run_stats_aggregates_state_and_blockers(tmp_path: Path) -> None
             "task_id": "",
             "severity": "high",
             "type": "implementation_gap",
-            "placeholder_marker": "ONESHOT-BLOCKER:B-E001-001",
+            "placeholder_marker": f"{ONESHOT_PLACEHOLDER_PREFIX}B-E001-001",
             "owner": "owner@example.com",
             "exit_criteria": "Fix tests",
             "status": "open",
@@ -140,7 +141,7 @@ def test_collect_run_stats_aggregates_state_and_blockers(tmp_path: Path) -> None
             "task_id": "",
             "severity": "high",
             "type": "implementation_gap",
-            "placeholder_marker": "ONESHOT-BLOCKER:B-E001-002",
+            "placeholder_marker": f"{ONESHOT_PLACEHOLDER_PREFIX}B-E001-002",
             "owner": "owner@example.com",
             "exit_criteria": "Fix tests",
             "status": "resolved",
@@ -165,7 +166,7 @@ def test_oneshot_id_regex_allows_suffixes_with_more_than_three_digits() -> None:
 
 def test_scan_placeholder_markers_captures_full_blocker_id_suffix(tmp_path: Path) -> None:
     marker_file = tmp_path / "marker.txt"
-    marker_file.write_text("TODO ONESHOT-BLOCKER:B-E001-1000\n", encoding="utf-8")
+    marker_file.write_text(f"TODO {ONESHOT_PLACEHOLDER_PREFIX}B-E001-1000\n", encoding="utf-8")
     hits = scan_placeholder_markers(tmp_path)
     assert len(hits) == 1
     assert hits[0][0] == marker_file
@@ -176,8 +177,8 @@ def test_scan_placeholder_markers_captures_full_blocker_id_suffix(tmp_path: Path
 def test_scan_placeholder_markers_ignores_prefix_without_blocker_id(tmp_path: Path) -> None:
     marker_file = tmp_path / "marker.txt"
     marker_file.write_text(
-        "Format: ONESHOT-BLOCKER:<blocker-id>\n"
-        "Example prefix only ONESHOT-BLOCKER:\n",
+        f"Format: {ONESHOT_PLACEHOLDER_PREFIX}<blocker-id>\n"
+        f"Example prefix only {ONESHOT_PLACEHOLDER_PREFIX}\n",
         encoding="utf-8",
     )
     hits = scan_placeholder_markers(tmp_path)
@@ -257,8 +258,20 @@ def test_build_scoped_prompt_adds_autoresearch_experiment_guidance() -> None:
         {"checkpoint_id": "C-E001-001", "feature_id": "F-001", "task_ids": ["T-F001-001"]},
         "autoresearch",
         ["python -m specctl.cli check --root ."],
+        {
+            "repo_path": "/tmp/autoresearch",
+            "worktree_path": "/tmp/autoresearch-worktree",
+            "program_path": "/tmp/autoresearch-worktree/program.md",
+            "results_path": "/tmp/autoresearch-worktree/results.tsv",
+            "branch": "autoresearch/apr5",
+            "run_tag": "apr5",
+            "base_ref": "master",
+            "cache_dir": "/tmp/autoresearch-cache",
+        },
     )
-    assert "- Runner: autoresearch" in prompt
-    assert "## Autoresearch Mode" in prompt
-    assert "measured experiment loop" in prompt
+    assert "exact karpathy/autoresearch repository" in prompt
+    assert "- Worktree: /tmp/autoresearch-worktree" in prompt
+    assert "- Branch: autoresearch/apr5" in prompt
+    assert "Only edit `train.py`." in prompt
+    assert "Run experiments with `uv run train.py > run.log 2>&1`." in prompt
     assert "`python -m specctl.cli check --root .`" in prompt
