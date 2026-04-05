@@ -263,6 +263,7 @@ def test_build_scoped_prompt_adds_autoresearch_experiment_guidance() -> None:
             "worktree_path": "/tmp/autoresearch-worktree",
             "program_path": "/tmp/autoresearch-worktree/program.md",
             "results_path": "/tmp/autoresearch-worktree/results.tsv",
+            "agent": "codex",
             "branch": "autoresearch/apr5",
             "run_tag": "apr5",
             "base_ref": "master",
@@ -272,6 +273,7 @@ def test_build_scoped_prompt_adds_autoresearch_experiment_guidance() -> None:
     assert "exact karpathy/autoresearch repository" in prompt
     assert "- Worktree: /tmp/autoresearch-worktree" in prompt
     assert "- Branch: autoresearch/apr5" in prompt
+    assert "- Outer agent: codex" in prompt
     assert "Only edit `train.py`." in prompt
     assert "Run experiments with `uv run train.py > run.log 2>&1`." in prompt
     assert "`python -m specctl.cli check --root .`" in prompt

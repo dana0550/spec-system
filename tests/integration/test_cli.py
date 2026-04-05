@@ -58,6 +58,34 @@ def create_autoresearch_repo(tmp_path: Path) -> tuple[Path, Path]:
     return repo, cache_dir
 
 
+def create_fake_agent_bin(tmp_path: Path, name: str) -> Path:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    script = bin_dir / name
+    script.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import json",
+                "import os",
+                "import pathlib",
+                "import sys",
+                "payload = {",
+                "    'argv': sys.argv[1:],",
+                "    'cwd': os.getcwd(),",
+                "    'program': pathlib.Path('program.md').read_text(encoding='utf-8'),",
+                "}",
+                "pathlib.Path('runner-output.json').write_text(json.dumps(payload), encoding='utf-8')",
+                "print('ok')",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    return bin_dir
+
+
 def test_init_creates_valid_structure(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -118,10 +146,12 @@ def test_feature_create_keeps_scenario_text_consistent_across_files(tmp_path: Pa
     assert f"- S-F001-001: {expected}" in ver_text
 
 
-def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tmp_path: Path) -> None:
+def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
     autoresearch_repo, cache_dir = create_autoresearch_repo(tmp_path)
+    agent_bin = create_fake_agent_bin(tmp_path, "codex")
+    monkeypatch.setenv("PATH", f"{agent_bin}{os.pathsep}{os.environ.get('PATH', '')}")
     assert main(["init", "--root", str(root)]) == 0
     brief = root / "brief.md"
     brief.write_text(
@@ -167,6 +197,8 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
                 "apr5",
                 "--autoresearch-cache-dir",
                 str(cache_dir),
+                "--autoresearch-agent",
+                "codex",
             ]
         )
         == 0
@@ -176,12 +208,8 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
     payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
     assert payload["runner"] == "autoresearch"
     assert payload["autoresearch"]["repo_path"] == str(autoresearch_repo)
+    assert payload["autoresearch"]["agent"] == "codex"
     payload["validation_commands"] = ['python -c "print(\'ok\')"']
-    payload["runner_command"] = (
-        "python -c \"from pathlib import Path; "
-        "Path(r'{autoresearch_worktree}').joinpath('runner.txt').write_text("
-        "Path(r'{autoresearch_program_path}').read_text())\""
-    )
     (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
 
     assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
@@ -192,7 +220,7 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     context = state["runner_context"]
     worktree = Path(context["worktree_path"])
-    runner_output = (worktree / "runner.txt").read_text(encoding="utf-8")
+    runner_output = json.loads((worktree / "runner-output.json").read_text(encoding="utf-8"))
     branch = subprocess.run(
         ["git", "-C", str(worktree), "branch", "--show-current"],
         check=True,
@@ -205,9 +233,12 @@ def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tm
     assert state["runner"] == "autoresearch"
     assert branch == "autoresearch/apr5"
     assert (worktree / "results.tsv").exists()
+    assert context["agent"] == "codex"
     assert "exact karpathy/autoresearch repository" in prompt_text
     assert "Only edit `train.py`." in prompt_text
-    assert runner_output == (worktree / "program.md").read_text(encoding="utf-8")
+    assert runner_output["cwd"] == str(worktree)
+    assert runner_output["argv"] == ["exec", "Read program.md and continue the loop."]
+    assert runner_output["program"] == (worktree / "program.md").read_text(encoding="utf-8")
 
 
 def test_epic_create_rejects_autoresearch_runner_without_repo_inputs(tmp_path: Path) -> None:

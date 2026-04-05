@@ -253,3 +253,61 @@ def test_project_lint_requires_autoresearch_config_for_autoresearch_runner(tmp_p
 
     messages, _, _ = lint_project(root)
     assert any(message.code == "AUTORESEARCH_CONFIG_INVALID" for message in messages)
+
+
+def test_project_lint_requires_autoresearch_launcher_for_autoresearch_runner(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief = root / "brief.md"
+    brief.write_text(
+        "\n".join(
+            [
+                "## Vision",
+                "- Improve reliability.",
+                "",
+                "## Outcomes",
+                "- Reduce failures.",
+                "",
+                "## User Journeys",
+                "- Operator reviews run output.",
+                "",
+                "## Constraints",
+                "- Preserve compatibility.",
+                "",
+                "## Non-Goals",
+                "- No UI changes.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AutoresearchValidation",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief),
+                "--runner",
+                "autoresearch",
+                "--autoresearch-repo-path",
+                "/tmp/autoresearch",
+                "--autoresearch-run-tag",
+                "apr5",
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["autoresearch"].pop("agent", None)
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    messages, _, _ = lint_project(root)
+    assert any(message.code == "AUTORESEARCH_LAUNCHER_MISSING" for message in messages)

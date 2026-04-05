@@ -50,6 +50,11 @@ ONESHOT_RUNNERS = {
     "codex",
 }
 
+AUTORESEARCH_AGENTS = {
+    "claude",
+    "codex",
+}
+
 REQUIRED_DOC_FILES = {
     "MASTER_SPEC.md",
     "FEATURES.md",

@@ -4,16 +4,18 @@
       "nodes": {
         "D-F001-001": {
           "entity_type": "design",
-          "hash": "2fd8f086fb453f90d150f7db585c45c50c583b033fb0c9cf60bb3e93d62d2d28",
+          "hash": "f614459507b003f81ce2a07439d9a3c5894bc0251e17c8839269f38925d3b18f",
           "line": 9,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/design.md",
           "references": [
             "R-F001-001",
-            "R-F001-002"
+            "R-F001-002",
+            "R-F001-006"
           ],
           "reviewed_upstream_hashes": {
             "R-F001-001": "9a2308b1c6100057e988312df53255e280beab5486686dea7bbac63bc0b15118",
-            "R-F001-002": "12c263d5a082c15b9623894adaf6e2a0f2ebc0b3d8e1be1297c45e8995d21112"
+            "R-F001-002": "12c263d5a082c15b9623894adaf6e2a0f2ebc0b3d8e1be1297c45e8995d21112",
+            "R-F001-006": "1abedc81a0f09e95b2a9391cf964115d651459886a1bc96536aa82e22acf5292"
           }
         },
         "D-F001-002": {
@@ -46,20 +48,34 @@
         },
         "D-F001-004": {
           "entity_type": "design",
-          "hash": "54bfbba6caeb7027565c290316fa8e902691c0bfcaaf2ef73705920b09a911cc",
+          "hash": "0e5ecaa260c809b80c7ee1956bd8762be78bdde297246f9930fa2cb649874d9b",
           "line": 12,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/design.md",
           "references": [
-            "R-F001-006"
+            "R-F001-006",
+            "R-F001-007"
           ],
           "reviewed_upstream_hashes": {
-            "R-F001-006": "da4721d5f733aa65afa4c8dc1216d0a88d75474054c66785af790c5061683e7e"
+            "R-F001-006": "1abedc81a0f09e95b2a9391cf964115d651459886a1bc96536aa82e22acf5292",
+            "R-F001-007": "6b7bbba2ff0511fbb82dc6833312d96c5339ed8725bfdc3b4b55150811cfbfa1"
+          }
+        },
+        "D-F001-005": {
+          "entity_type": "design",
+          "hash": "4ae49a025a94e38d85262b36726db5cd1077a7c7a9f35b9bf38240050fe97aa3",
+          "line": 13,
+          "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/design.md",
+          "references": [
+            "R-F001-007"
+          ],
+          "reviewed_upstream_hashes": {
+            "R-F001-007": "6b7bbba2ff0511fbb82dc6833312d96c5339ed8725bfdc3b4b55150811cfbfa1"
           }
         },
         "EVIDENCE(S-F001-001)": {
           "entity_type": "evidence",
-          "hash": "03626549a59abf648ee59163b3b8acbf66c36513cb1e76d6e277bc044c926e30",
-          "line": 12,
+          "hash": "ac457b5459e032fbeb53732218b3393310d58661cd196547d5e493ed213c38e2",
+          "line": 13,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/verification.md",
           "references": [
             "S-F001-001"
@@ -70,8 +86,8 @@
         },
         "EVIDENCE(S-F001-002)": {
           "entity_type": "evidence",
-          "hash": "03626549a59abf648ee59163b3b8acbf66c36513cb1e76d6e277bc044c926e30",
-          "line": 13,
+          "hash": "0930b0974634ec7bc26443c76caf6498bb19cb0b8a7316492eb5b7e9aa0e7889",
+          "line": 14,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/verification.md",
           "references": [
             "S-F001-002"
@@ -82,14 +98,26 @@
         },
         "EVIDENCE(S-F001-003)": {
           "entity_type": "evidence",
-          "hash": "03626549a59abf648ee59163b3b8acbf66c36513cb1e76d6e277bc044c926e30",
-          "line": 14,
+          "hash": "ac457b5459e032fbeb53732218b3393310d58661cd196547d5e493ed213c38e2",
+          "line": 15,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/verification.md",
           "references": [
             "S-F001-003"
           ],
           "reviewed_upstream_hashes": {
-            "S-F001-003": "50954b63e7eff684e76196cbb4f447d82e141e9f58e018f8dd428024c12eba53"
+            "S-F001-003": "7ca188c3580f74081354d086deea3d51ed3f7fc2b9813ef397fdb09a637639c4"
+          }
+        },
+        "EVIDENCE(S-F001-004)": {
+          "entity_type": "evidence",
+          "hash": "51b871efe079e048574bef42fc37dde0874973e24b71b17b710ab79975a85103",
+          "line": 16,
+          "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/verification.md",
+          "references": [
+            "S-F001-004"
+          ],
+          "reviewed_upstream_hashes": {
+            "S-F001-004": "50954b63e7eff684e76196cbb4f447d82e141e9f58e018f8dd428024c12eba53"
           }
         },
         "R-F001-001": {
@@ -134,8 +162,16 @@
         },
         "R-F001-006": {
           "entity_type": "requirement",
-          "hash": "da4721d5f733aa65afa4c8dc1216d0a88d75474054c66785af790c5061683e7e",
+          "hash": "1abedc81a0f09e95b2a9391cf964115d651459886a1bc96536aa82e22acf5292",
           "line": 16,
+          "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "R-F001-007": {
+          "entity_type": "requirement",
+          "hash": "6b7bbba2ff0511fbb82dc6833312d96c5339ed8725bfdc3b4b55150811cfbfa1",
+          "line": 17,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/requirements.md",
           "references": [],
           "reviewed_upstream_hashes": {}
@@ -143,7 +179,7 @@
         "S-F001-001": {
           "entity_type": "scenario",
           "hash": "82522e215b97a8ccc64ca1fe8d47f83920c4c56faa358a520d8842c9aac8bafb",
-          "line": 17,
+          "line": 18,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/requirements.md",
           "references": [],
           "reviewed_upstream_hashes": {}
@@ -151,33 +187,43 @@
         "S-F001-002": {
           "entity_type": "scenario",
           "hash": "b76c8e2f8c0fcf26f4a8f86c38d72144bff0f159fb6b57c7f95aa97c570d6464",
-          "line": 18,
+          "line": 19,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/requirements.md",
           "references": [],
           "reviewed_upstream_hashes": {}
         },
         "S-F001-003": {
           "entity_type": "scenario",
+          "hash": "7ca188c3580f74081354d086deea3d51ed3f7fc2b9813ef397fdb09a637639c4",
+          "line": 20,
+          "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/requirements.md",
+          "references": [],
+          "reviewed_upstream_hashes": {}
+        },
+        "S-F001-004": {
+          "entity_type": "scenario",
           "hash": "50954b63e7eff684e76196cbb4f447d82e141e9f58e018f8dd428024c12eba53",
-          "line": 19,
+          "line": 21,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/requirements.md",
           "references": [],
           "reviewed_upstream_hashes": {}
         },
         "T-F001-001": {
           "entity_type": "task",
-          "hash": "d6b0ad2b5eb2a19b3fa2c16ea4fa0dd8ce123f319f50e1c7a97c14ec5b8cabd5",
+          "hash": "17c07847bd3738d5de33aea7ee143dc78af6ec834237d3825e9d077ccab4e42c",
           "line": 9,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/tasks.md",
           "references": [
             "D-F001-001",
             "R-F001-001",
-            "R-F001-003"
+            "R-F001-003",
+            "R-F001-006"
           ],
           "reviewed_upstream_hashes": {
-            "D-F001-001": "2fd8f086fb453f90d150f7db585c45c50c583b033fb0c9cf60bb3e93d62d2d28",
+            "D-F001-001": "f614459507b003f81ce2a07439d9a3c5894bc0251e17c8839269f38925d3b18f",
             "R-F001-001": "9a2308b1c6100057e988312df53255e280beab5486686dea7bbac63bc0b15118",
-            "R-F001-003": "761cfb2d6d0aa46c6b1043a5e79598e1e3900b19378aa47984fcd1c490ba53f6"
+            "R-F001-003": "761cfb2d6d0aa46c6b1043a5e79598e1e3900b19378aa47984fcd1c490ba53f6",
+            "R-F001-006": "1abedc81a0f09e95b2a9391cf964115d651459886a1bc96536aa82e22acf5292"
           }
         },
         "T-F001-002": {
@@ -214,21 +260,25 @@
         },
         "T-F001-004": {
           "entity_type": "task",
-          "hash": "db1da4cf4dea258b03daf2cd6f467655921e8f51f604c0b00bf210d07a78b004",
+          "hash": "0db8e597bcefea2e7e96f002b18a739698ad1ed53798f7a09e181e9eeee56da9",
           "line": 12,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/tasks.md",
           "references": [
             "D-F001-004",
-            "R-F001-006"
+            "D-F001-005",
+            "R-F001-006",
+            "R-F001-007"
           ],
           "reviewed_upstream_hashes": {
-            "D-F001-004": "54bfbba6caeb7027565c290316fa8e902691c0bfcaaf2ef73705920b09a911cc",
-            "R-F001-006": "da4721d5f733aa65afa4c8dc1216d0a88d75474054c66785af790c5061683e7e"
+            "D-F001-004": "0e5ecaa260c809b80c7ee1956bd8762be78bdde297246f9930fa2cb649874d9b",
+            "D-F001-005": "4ae49a025a94e38d85262b36726db5cd1077a7c7a9f35b9bf38240050fe97aa3",
+            "R-F001-006": "1abedc81a0f09e95b2a9391cf964115d651459886a1bc96536aa82e22acf5292",
+            "R-F001-007": "6b7bbba2ff0511fbb82dc6833312d96c5339ed8725bfdc3b4b55150811cfbfa1"
           }
         },
         "T-F001-005": {
           "entity_type": "task",
-          "hash": "da499690b4ca6363ba3983dfc861cb31f86f3a726ba57d01db5db1f068d332f7",
+          "hash": "59172a2fc23990ddb6055e91194a88709e5c7d865fcf4b3e92685dfe9adbb4ad",
           "line": 13,
           "path": "docs/features/F-001-karpathy-autoresearch-runner-integration/tasks.md",
           "references": [
@@ -236,29 +286,33 @@
             "D-F001-002",
             "D-F001-003",
             "D-F001-004",
+            "D-F001-005",
             "R-F001-001",
             "R-F001-002",
             "R-F001-003",
             "R-F001-004",
             "R-F001-005",
-            "R-F001-006"
+            "R-F001-006",
+            "R-F001-007"
           ],
           "reviewed_upstream_hashes": {
-            "D-F001-001": "2fd8f086fb453f90d150f7db585c45c50c583b033fb0c9cf60bb3e93d62d2d28",
+            "D-F001-001": "f614459507b003f81ce2a07439d9a3c5894bc0251e17c8839269f38925d3b18f",
             "D-F001-002": "d88b70dc33aae7eb20461f92ef5e6d2bc5819283288c127fbf5a72f88d1e263f",
             "D-F001-003": "f8ddcfe6f9202b28c44d66602aaaadcc5631b0ba13c5e27ecf4e692bf252be92",
-            "D-F001-004": "54bfbba6caeb7027565c290316fa8e902691c0bfcaaf2ef73705920b09a911cc",
+            "D-F001-004": "0e5ecaa260c809b80c7ee1956bd8762be78bdde297246f9930fa2cb649874d9b",
+            "D-F001-005": "4ae49a025a94e38d85262b36726db5cd1077a7c7a9f35b9bf38240050fe97aa3",
             "R-F001-001": "9a2308b1c6100057e988312df53255e280beab5486686dea7bbac63bc0b15118",
             "R-F001-002": "12c263d5a082c15b9623894adaf6e2a0f2ebc0b3d8e1be1297c45e8995d21112",
             "R-F001-003": "761cfb2d6d0aa46c6b1043a5e79598e1e3900b19378aa47984fcd1c490ba53f6",
             "R-F001-004": "f548461ad8e89e62fbe582ae737263c9b5c10d62d1681f684ad864793be779f4",
             "R-F001-005": "99a149170f1875c55255a9f9ecf85a8013ce7cd6b6ce04ef3f9a5a8ca5dda0e7",
-            "R-F001-006": "da4721d5f733aa65afa4c8dc1216d0a88d75474054c66785af790c5061683e7e"
+            "R-F001-006": "1abedc81a0f09e95b2a9391cf964115d651459886a1bc96536aa82e22acf5292",
+            "R-F001-007": "6b7bbba2ff0511fbb82dc6833312d96c5339ed8725bfdc3b4b55150811cfbfa1"
           }
         }
       }
     }
   },
-  "generated_at": "20260405-112904",
+  "generated_at": "20260405-114428",
   "schema_version": "1"
 }

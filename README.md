@@ -195,18 +195,24 @@ Supported runner values:
 - `claude`
 - `autoresearch`
 
-`autoresearch` targets the exact `karpathy/autoresearch` repository instead of a generic prompt mode. When selected, the contract needs an `autoresearch` block with a repo path and run tag. `specctl` prepares an isolated git worktree on branch `autoresearch/<run_tag>`, initializes `results.tsv`, and writes the checkpoint `program.md` into that worktree before launching the outer agent command.
+`autoresearch` targets the exact `karpathy/autoresearch` repository instead of a generic prompt mode. When selected, the contract needs an `autoresearch` block with a repo path and run tag. `specctl` prepares an isolated git worktree on branch `autoresearch/<run_tag>`, initializes `results.tsv`, writes the checkpoint `program.md` into that worktree, and launches a synthesized outer-agent command for `codex` or `claude` unless you explicitly override it with `runner_command`.
 
 Minimal `autoresearch` extension:
 
 ```yaml
 runner: autoresearch
-runner_command: codex exec --cwd {autoresearch_worktree} "Read program.md and continue the loop."
 autoresearch:
   repo_path: /absolute/path/to/autoresearch
   run_tag: apr5
+  agent: codex
   base_ref: master
   cache_dir: ~/.cache/autoresearch
+```
+
+Optional `runner_command` override:
+
+```yaml
+runner_command: python -c "print(r'{autoresearch_program_path}')"
 ```
 
 Supported placeholders in `runner_command`:
@@ -309,6 +315,7 @@ specctl impact refresh [--feature-id F-###] [--ack-upstream]
 specctl epic create --name "..." --owner <owner> --brief ./brief.md [--runner codex|claude|autoresearch]
   [--autoresearch-repo-path /path/to/autoresearch]
   [--autoresearch-run-tag apr5]
+  [--autoresearch-agent codex|claude]
   [--autoresearch-base-ref master]
   [--autoresearch-cache-dir ~/.cache/autoresearch]
 specctl epic check --epic-id E-###

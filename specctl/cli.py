@@ -23,7 +23,7 @@ from specctl.commands import (
     render,
     report,
 )
-from specctl.constants import ONESHOT_RUNNERS
+from specctl.constants import AUTORESEARCH_AGENTS, ONESHOT_RUNNERS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -82,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     epic_create_parser.add_argument("--autoresearch-run-tag")
     epic_create_parser.add_argument("--autoresearch-base-ref")
     epic_create_parser.add_argument("--autoresearch-cache-dir")
+    epic_create_parser.add_argument("--autoresearch-agent", choices=sorted(AUTORESEARCH_AGENTS), default="codex")
     epic_create_parser.set_defaults(func=epic_create.run)
 
     epic_check_parser = epic_sub.add_parser("check", help="Validate one epic and its one-shot artifacts")

@@ -5,7 +5,7 @@ import shlex
 from pathlib import Path
 from typing import Any
 
-from specctl.autoresearch import build_autoresearch_program, expand_autoresearch_command, sync_autoresearch_program
+from specctl.autoresearch import build_autoresearch_program, resolve_autoresearch_command, sync_autoresearch_program
 from specctl.commands.oneshot_common import append_event, run_shell
 from specctl.constants import ONESHOT_PLACEHOLDER_PREFIX
 from specctl.io_utils import now_date, write_text
@@ -63,12 +63,15 @@ def process_checkpoint(
         sync_autoresearch_program(runner_context, prompt_text)
 
     runner_command = checkpoint.get("runner_command") or contract.get("runner_command")
-    if isinstance(runner_command, str) and runner_command.strip():
-        command_root = root
+    expanded_command = ""
+    command_root = root
+    if runner == "autoresearch" and isinstance(runner_context, dict):
+        expanded_command = resolve_autoresearch_command(runner_command, runner_context)
+        command_root = Path(runner_context["worktree_path"])
+    elif isinstance(runner_command, str) and runner_command.strip():
         expanded_command = runner_command
-        if runner == "autoresearch" and isinstance(runner_context, dict):
-            expanded_command = expand_autoresearch_command(runner_command, runner_context)
-            command_root = Path(runner_context["worktree_path"])
+
+    if expanded_command:
         rc, output = run_shell(expanded_command, command_root)
         append_event(
             run_dir,
@@ -356,5 +359,6 @@ def fallback_output(message: str, runner: str, runner_context: dict[str, str] | 
         return message
     return (
         f"{message} Prepared exact karpathy/autoresearch worktree at {runner_context['worktree_path']} "
-        f"on branch {runner_context['branch']} with program {runner_context['program_path']}."
+        f"on branch {runner_context['branch']} with program {runner_context['program_path']} "
+        f"for outer agent {runner_context.get('agent') or 'runner_command override'}."
     )

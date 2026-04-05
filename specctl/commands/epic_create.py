@@ -222,6 +222,7 @@ def run(args) -> int:
         autoresearch_payload = {
             "repo_path": args.autoresearch_repo_path,
             "run_tag": args.autoresearch_run_tag,
+            "agent": args.autoresearch_agent,
         }
         if args.autoresearch_base_ref:
             autoresearch_payload["base_ref"] = args.autoresearch_base_ref

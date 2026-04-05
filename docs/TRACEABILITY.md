@@ -7,8 +7,8 @@ last_rendered: 2026-04-05
 
 | Metric | Value |
 |---|---:|
-| Requirements total | 6 |
-| Requirements linked in design | 6 (100%) |
-| Requirements linked in tasks | 6 (100%) |
-| Scenarios total | 3 |
-| Scenarios with evidence | 3 (100%) |
+| Requirements total | 7 |
+| Requirements linked in design | 7 (100%) |
+| Requirements linked in tasks | 7 (100%) |
+| Scenarios total | 4 |
+| Scenarios with evidence | 4 (100%) |

@@ -28,6 +28,7 @@
   "autoresearch": {
     "repo_path": "/absolute/path/to/autoresearch",
     "run_tag": "apr5",
+    "agent": "codex",
     "base_ref": "master",
     "cache_dir": "~/.cache/autoresearch"
   },

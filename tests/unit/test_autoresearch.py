@@ -4,10 +4,13 @@ import os
 from pathlib import Path
 import subprocess
 
+import pytest
+
 from specctl.autoresearch import (
     AUTORESEARCH_RESULTS_HEADER,
     expand_autoresearch_command,
     prepare_autoresearch_context,
+    resolve_autoresearch_command,
     validate_autoresearch_contract,
 )
 
@@ -63,6 +66,7 @@ def test_prepare_autoresearch_context_creates_worktree_and_results_header(tmp_pa
             "repo_path": str(repo),
             "run_tag": "apr5",
             "cache_dir": str(cache_dir),
+            "agent": "codex",
         },
     }
 
@@ -80,6 +84,45 @@ def test_prepare_autoresearch_context_creates_worktree_and_results_header(tmp_pa
         encoding="utf-8",
     ).stdout.strip()
     assert branch == "autoresearch/apr5"
+    assert context["agent"] == "codex"
+
+
+def test_prepare_autoresearch_context_rejects_missing_cache_dir(tmp_path: Path) -> None:
+    repo, cache_dir = _create_autoresearch_repo(tmp_path)
+    cache_dir.rmdir()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    contract = {
+        "runner": "autoresearch",
+        "autoresearch": {
+            "repo_path": str(repo),
+            "run_tag": "apr5",
+            "cache_dir": str(cache_dir),
+            "agent": "codex",
+        },
+    }
+
+    with pytest.raises(ValueError, match="cache directory not found"):
+        prepare_autoresearch_context(tmp_path, contract, run_dir)
+
+
+def test_prepare_autoresearch_context_rejects_missing_required_files(tmp_path: Path) -> None:
+    repo, cache_dir = _create_autoresearch_repo(tmp_path)
+    (repo / "train.py").unlink()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    contract = {
+        "runner": "autoresearch",
+        "autoresearch": {
+            "repo_path": str(repo),
+            "run_tag": "apr5",
+            "cache_dir": str(cache_dir),
+            "agent": "codex",
+        },
+    }
+
+    with pytest.raises(ValueError, match="required files"):
+        prepare_autoresearch_context(tmp_path, contract, run_dir)
 
 
 def test_expand_autoresearch_command_replaces_placeholders() -> None:
@@ -91,6 +134,7 @@ def test_expand_autoresearch_command_replaces_placeholders() -> None:
             "worktree_path": "/worktree",
             "program_path": "/worktree/program.md",
             "results_path": "/worktree/results.tsv",
+            "agent": "codex",
             "branch": "autoresearch/apr5",
             "run_tag": "apr5",
             "base_ref": "master",
@@ -100,3 +144,38 @@ def test_expand_autoresearch_command_replaces_placeholders() -> None:
     assert "{autoresearch_" not in expanded
     assert "/worktree" in expanded
     assert "autoresearch/apr5" in expanded
+
+
+def test_resolve_autoresearch_command_synthesizes_codex_launcher() -> None:
+    command = resolve_autoresearch_command(
+        None,
+        {
+            "repo_path": "/repo",
+            "worktree_path": "/worktree",
+            "program_path": "/worktree/program.md",
+            "results_path": "/worktree/results.tsv",
+            "agent": "codex",
+            "branch": "autoresearch/apr5",
+            "run_tag": "apr5",
+            "base_ref": "master",
+            "cache_dir": "/cache",
+        },
+    )
+
+    assert command == 'codex exec "Read program.md and continue the loop."'
+
+
+def test_validate_autoresearch_contract_requires_agent_or_runner_override(tmp_path: Path) -> None:
+    messages = validate_autoresearch_contract(
+        {
+            "runner": "autoresearch",
+            "checkpoint_graph": [],
+            "autoresearch": {
+                "repo_path": "/tmp/autoresearch",
+                "run_tag": "apr5",
+            },
+        },
+        tmp_path / "oneshot.yaml",
+    )
+
+    assert any(message.code == "AUTORESEARCH_LAUNCHER_MISSING" for message in messages)

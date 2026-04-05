@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from specctl.constants import AUTORESEARCH_AGENTS
 from specctl.io_utils import write_text
 from specctl.models import LintMessage
 from specctl.oneshot_utils import dump_json_document, load_json_document
@@ -14,6 +15,7 @@ from specctl.oneshot_utils import dump_json_document, load_json_document
 
 AUTORESEARCH_CONTEXT_FILE = "autoresearch-context.json"
 AUTORESEARCH_RESULTS_HEADER = "commit\tval_bpb\tmemory_gb\tstatus\tdescription\n"
+AUTORESEARCH_LAUNCH_PROMPT = "Read program.md and continue the loop."
 AUTORESEARCH_REQUIRED_FILES = (
     "README.md",
     "prepare.py",
@@ -30,6 +32,7 @@ class AutoresearchContext:
     worktree_path: Path
     program_path: Path
     results_path: Path
+    agent: str
     branch: str
     run_tag: str
     base_ref: str
@@ -41,6 +44,7 @@ class AutoresearchContext:
             "worktree_path": str(self.worktree_path),
             "program_path": str(self.program_path),
             "results_path": str(self.results_path),
+            "agent": self.agent,
             "branch": self.branch,
             "run_tag": self.run_tag,
             "base_ref": self.base_ref,
@@ -105,20 +109,36 @@ def validate_autoresearch_contract(payload: dict[str, Any], oneshot_path: Path) 
                 )
             )
 
-    has_runner_command = isinstance(payload.get("runner_command"), str) and payload.get("runner_command", "").strip()
-    checkpoints = payload.get("checkpoint_graph", [])
-    has_checkpoint_command = isinstance(checkpoints, list) and any(
-        isinstance(checkpoint, dict)
-        and isinstance(checkpoint.get("runner_command"), str)
-        and checkpoint.get("runner_command", "").strip()
-        for checkpoint in checkpoints
-    )
-    if not has_runner_command and not has_checkpoint_command:
+    agent = config.get("agent")
+    if agent is not None and not isinstance(agent, str):
         messages.append(
             LintMessage(
-                severity="WARN",
-                code="AUTORESEARCH_COMMAND_MISSING",
-                message="autoresearch workspace will be prepared, but no runner_command is configured to launch an outer agent",
+                severity="ERROR",
+                code="AUTORESEARCH_CONFIG_INVALID",
+                message="autoresearch.agent must be a string when provided",
+                path=oneshot_path,
+            )
+        )
+    elif isinstance(agent, str) and agent.strip() and agent not in AUTORESEARCH_AGENTS:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="AUTORESEARCH_AGENT_INVALID",
+                message=(
+                    f"autoresearch.agent '{agent}' is not supported; "
+                    f"expected one of {', '.join(sorted(AUTORESEARCH_AGENTS))}"
+                ),
+                path=oneshot_path,
+            )
+        )
+
+    has_agent = isinstance(agent, str) and bool(agent.strip())
+    if not _has_autoresearch_runner_command(payload) and not has_agent:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="AUTORESEARCH_LAUNCHER_MISSING",
+                message="runner 'autoresearch' requires autoresearch.agent or a runner_command override",
                 path=oneshot_path,
             )
         )
@@ -140,6 +160,8 @@ def prepare_autoresearch_context(root: Path, contract: dict[str, Any], run_dir: 
     cache_dir = config["cache_dir"]
     if not cache_dir.exists():
         raise ValueError(f"Autoresearch cache directory not found: {cache_dir}")
+    if not config["agent"] and not _has_autoresearch_runner_command(contract):
+        raise ValueError("runner 'autoresearch' requires autoresearch.agent or a runner_command override")
 
     base_ref = config["base_ref"] or _detect_base_ref(repo_path)
     branch = f"autoresearch/{config['run_tag']}"
@@ -159,6 +181,7 @@ def prepare_autoresearch_context(root: Path, contract: dict[str, Any], run_dir: 
         worktree_path=worktree_path,
         program_path=worktree_path / "program.md",
         results_path=results_path,
+        agent=str(config["agent"]),
         branch=branch,
         run_tag=config["run_tag"],
         base_ref=base_ref,
@@ -194,6 +217,22 @@ def expand_autoresearch_command(command: str, context: dict[str, str]) -> str:
     return expanded
 
 
+def resolve_autoresearch_command(command: str | None, context: dict[str, str]) -> str:
+    if isinstance(command, str) and command.strip():
+        return expand_autoresearch_command(command, context)
+
+    agent = context.get("agent", "").strip()
+    if not agent:
+        raise ValueError("runner 'autoresearch' requires autoresearch.agent or a runner_command override")
+    if agent == "codex":
+        return f'codex exec "{AUTORESEARCH_LAUNCH_PROMPT}"'
+    if agent == "claude":
+        return f'claude -p "{AUTORESEARCH_LAUNCH_PROMPT}"'
+    raise ValueError(
+        f"autoresearch.agent '{agent}' is not supported; expected one of {', '.join(sorted(AUTORESEARCH_AGENTS))}"
+    )
+
+
 def build_autoresearch_program(
     *,
     epic_id: str,
@@ -222,6 +261,7 @@ def build_autoresearch_program(
         f"- Run tag: {context['run_tag']}",
         f"- Results file: {context['results_path']}",
         f"- Cache dir already checked: {context['cache_dir']}",
+        f"- Outer agent: {context.get('agent') or 'runner_command override'}",
         "",
         "## Repo Contract",
         "- Read `README.md`, `prepare.py`, `train.py`, and this `program.md` before you begin.",
@@ -284,12 +324,23 @@ def _resolve_autoresearch_config(root: Path, contract: dict[str, Any]) -> dict[s
     if not isinstance(cache_raw, str) or not cache_raw.strip():
         raise ValueError("autoresearch.cache_dir must be a string when provided")
     cache_dir = Path(os.path.expanduser(cache_raw)).resolve()
+    agent_raw = config.get("agent", "")
+    if agent_raw is None:
+        agent_raw = ""
+    if not isinstance(agent_raw, str):
+        raise ValueError("autoresearch.agent must be a string when provided")
+    agent = agent_raw.strip()
+    if agent and agent not in AUTORESEARCH_AGENTS:
+        raise ValueError(
+            f"autoresearch.agent '{agent}' is not supported; expected one of {', '.join(sorted(AUTORESEARCH_AGENTS))}"
+        )
 
     return {
         "repo_path": repo_path,
         "run_tag": run_tag,
         "base_ref": base_ref.strip(),
         "cache_dir": cache_dir,
+        "agent": agent,
     }
 
 
@@ -297,6 +348,18 @@ def _verify_required_files(path: Path) -> None:
     missing = [name for name in AUTORESEARCH_REQUIRED_FILES if not (path / name).exists()]
     if missing:
         raise ValueError(f"Autoresearch repo missing required files: {', '.join(missing)}")
+
+
+def _has_autoresearch_runner_command(payload: dict[str, Any]) -> bool:
+    has_runner_command = isinstance(payload.get("runner_command"), str) and payload.get("runner_command", "").strip()
+    checkpoints = payload.get("checkpoint_graph", [])
+    has_checkpoint_command = isinstance(checkpoints, list) and any(
+        isinstance(checkpoint, dict)
+        and isinstance(checkpoint.get("runner_command"), str)
+        and checkpoint.get("runner_command", "").strip()
+        for checkpoint in checkpoints
+    )
+    return bool(has_runner_command or has_checkpoint_command)
 
 
 def _detect_base_ref(repo_path: Path) -> str:
