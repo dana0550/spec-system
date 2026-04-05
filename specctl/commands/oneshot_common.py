@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 from specctl.epic_index import read_epic_rows
 from specctl.oneshot_utils import dump_json_document, load_json_document
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_epic_and_contract(root: Path, epic_id: str) -> tuple[dict[str, Any], str | None]:
@@ -43,17 +48,16 @@ def run_shell(command: str, root: Path) -> tuple[int, str]:
         return 1, "Empty command."
 
     try:
-        proc = subprocess.run(
-            argv,
-            cwd=root,
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-        )
+        proc = _run_argv(argv, root)
     except OSError as exc:
-        return 1, f"Unable to execute command '{argv[0]}': {exc}"
+        if argv[0] == "python" and sys.executable:
+            fallback_argv = [sys.executable, *argv[1:]]
+            try:
+                proc = _run_argv(fallback_argv, root)
+            except OSError:
+                return 1, f"Unable to execute command '{argv[0]}': {exc}"
+        else:
+            return 1, f"Unable to execute command '{argv[0]}': {exc}"
     return proc.returncode, (proc.stdout or "")
 
 
@@ -67,3 +71,30 @@ def read_run_state(run_dir: Path) -> dict[str, Any]:
 
 def write_run_state(run_dir: Path, payload: dict[str, Any]) -> None:
     dump_json_document(run_dir / "state.json", payload)
+
+
+def _run_argv(argv: list[str], root: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        argv,
+        cwd=root,
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        env=_command_env(argv),
+    )
+
+
+def _command_env(argv: list[str]) -> dict[str, str] | None:
+    if len(argv) < 3 or argv[1] != "-m" or argv[2] != "specctl.cli":
+        return None
+
+    env = os.environ.copy()
+    repo_root = str(REPO_ROOT)
+    existing = env.get("PYTHONPATH", "")
+    parts = [part for part in existing.split(os.pathsep) if part]
+    if repo_root not in parts:
+        parts.insert(0, repo_root)
+    env["PYTHONPATH"] = os.pathsep.join(parts)
+    return env

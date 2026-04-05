@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
+from specctl.commands import oneshot_common
 from specctl.commands.oneshot_common import run_shell
 from specctl.commands.oneshot_runtime import (
     build_scoped_prompt,
@@ -204,6 +208,40 @@ def test_parse_task_ids_accepts_variable_width_dotted_segments() -> None:
     ids = parse_task_ids(text)
     assert "T-F001.1-001" in ids
     assert "T-F001.010-001" in ids
+
+
+def test_run_shell_falls_back_to_sys_executable_when_python_binary_is_missing(tmp_path: Path, monkeypatch) -> None:
+    seen: list[str] = []
+
+    def fake_run(argv, **kwargs):
+        seen.append(argv[0])
+        if argv[0] == "python":
+            raise OSError("missing python")
+        return subprocess.CompletedProcess(argv, 0, "ok\n")
+
+    monkeypatch.setattr(oneshot_common.subprocess, "run", fake_run)
+    rc, output = run_shell('python -c "print(\'ok\')"', tmp_path)
+
+    assert rc == 0
+    assert output == "ok\n"
+    assert seen == ["python", sys.executable]
+
+
+def test_run_shell_injects_repo_pythonpath_for_specctl_module_commands(tmp_path: Path, monkeypatch) -> None:
+    captured_env: dict[str, str] | None = None
+
+    def fake_run(argv, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs.get("env")
+        return subprocess.CompletedProcess(argv, 0, "ok\n")
+
+    monkeypatch.setattr(oneshot_common.subprocess, "run", fake_run)
+    rc, output = run_shell("python -m specctl.cli lint --root .", tmp_path)
+
+    assert rc == 0
+    assert output == "ok\n"
+    assert captured_env is not None
+    assert str(oneshot_common.REPO_ROOT) in captured_env["PYTHONPATH"].split(os.pathsep)
 
 
 def test_prompt_suffix_for_autoresearch_uses_program_artifacts() -> None:
