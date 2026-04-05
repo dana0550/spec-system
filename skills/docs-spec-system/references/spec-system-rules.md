@@ -131,6 +131,8 @@ Global contract:
 Epic contract:
 
 - `brief -> decomposition -> oneshot contract -> run checkpoints -> blocker ledger -> finalize evidence`
+- `oneshot.yaml.runner` MUST be one of `codex`, `claude`, or `autoresearch`
+- `autoresearch` runner prompts are emitted as checkpoint `*.program.md` artifacts
 - Epic one-shot finalize requires:
   - zero open blockers
   - zero unresolved `ONESHOT-BLOCKER:*` markers

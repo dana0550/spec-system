@@ -23,6 +23,7 @@ from specctl.commands import (
     render,
     report,
 )
+from specctl.constants import ONESHOT_RUNNERS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,6 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     epic_create_parser.add_argument("--owner", default="unassigned")
     epic_create_parser.add_argument("--brief", required=True)
     epic_create_parser.add_argument("--feature-id")
+    epic_create_parser.add_argument("--runner", choices=sorted(ONESHOT_RUNNERS), default="codex")
     epic_create_parser.set_defaults(func=epic_create.run)
 
     epic_check_parser = epic_sub.add_parser("check", help="Validate one epic and its one-shot artifacts")
@@ -89,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     oneshot_run_parser = oneshot_sub.add_parser("run", help="Start one-shot execution for an epic")
     oneshot_run_parser.add_argument("--root", default=".")
     oneshot_run_parser.add_argument("--epic-id", required=True)
-    oneshot_run_parser.add_argument("--runner", choices=["codex", "claude"])
+    oneshot_run_parser.add_argument("--runner", choices=sorted(ONESHOT_RUNNERS))
     oneshot_run_parser.set_defaults(func=oneshot_run.run)
 
     oneshot_resume_parser = oneshot_sub.add_parser("resume", help="Resume an existing one-shot run")

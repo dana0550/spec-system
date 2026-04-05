@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import yaml
+
 from specctl.cli import main
 from specctl.validators.project import lint_project
 from specctl.validators.requirements import validate_requirements_file
@@ -146,3 +148,55 @@ def test_project_lint_runs_epic_validation_when_features_dir_missing(tmp_path: P
     codes = {message.code for message in messages}
     assert "FEATURES_DIR_MISSING" in codes
     assert "EPIC_ROOT_FEATURE_MISSING" in codes
+
+
+def test_project_lint_rejects_unsupported_oneshot_runner(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief = root / "brief.md"
+    brief.write_text(
+        "\n".join(
+            [
+                "## Vision",
+                "- Improve reliability.",
+                "",
+                "## Outcomes",
+                "- Reduce failures.",
+                "",
+                "## User Journeys",
+                "- Operator reviews run output.",
+                "",
+                "## Constraints",
+                "- Preserve compatibility.",
+                "",
+                "## Non-Goals",
+                "- No UI changes.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "RunnerValidation",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief),
+            ]
+        )
+        == 0
+    )
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    payload["runner"] = "unknown-runner"
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    messages, _, _ = lint_project(root)
+    assert any(message.code == "ONESHOT_RUNNER_INVALID" for message in messages)

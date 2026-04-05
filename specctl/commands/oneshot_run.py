@@ -3,7 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from specctl.commands.oneshot_common import load_epic_and_contract, write_run_state
-from specctl.commands.oneshot_runtime import CheckpointExecutionConfig, finalize_run_status, process_checkpoint, write_summary
+from specctl.commands.oneshot_runtime import (
+    CheckpointExecutionConfig,
+    finalize_run_status,
+    process_checkpoint,
+    prompt_suffix_for_runner,
+    write_summary,
+)
 from specctl.io_utils import now_timestamp, write_text
 from specctl.oneshot_utils import empty_blocker_ledger, new_run_id, parse_blockers, write_memory_files
 
@@ -49,7 +55,7 @@ def run(args) -> int:
     if not isinstance(repair_commands, list):
         repair_commands = []
     run_config = CheckpointExecutionConfig(
-        prompt_suffix=".prompt.md",
+        prompt_suffix=prompt_suffix_for_runner(runner),
         checkpoint_event_type="checkpoint_start",
         checkpoint_event_extra={"runner": runner},
         runner_event_type="runner_invocation",

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from specctl.constants import ONESHOT_RUNNERS
 from specctl.models import EpicRow, FeatureRow, LintMessage
 from specctl.oneshot_utils import HARD_STOP_TYPES, load_json_document, parse_blockers, parse_task_ids
 
@@ -49,6 +50,26 @@ def validate_oneshot_contract(
                 severity="ERROR",
                 code="ONESHOT_CONTRACT_MISSING",
                 message=f"oneshot.yaml missing required keys: {', '.join(missing)}",
+                path=oneshot_path,
+            )
+        )
+
+    runner = payload.get("runner", "")
+    if not isinstance(runner, str) or not runner:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="ONESHOT_RUNNER_INVALID",
+                message="runner must be a non-empty string",
+                path=oneshot_path,
+            )
+        )
+    elif runner not in ONESHOT_RUNNERS:
+        messages.append(
+            LintMessage(
+                severity="ERROR",
+                code="ONESHOT_RUNNER_INVALID",
+                message=f"runner '{runner}' is not supported; expected one of {', '.join(sorted(ONESHOT_RUNNERS))}",
                 path=oneshot_path,
             )
         )

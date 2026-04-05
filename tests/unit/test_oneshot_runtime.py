@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 
 from specctl.commands.oneshot_common import run_shell
-from specctl.commands.oneshot_runtime import finalize_run_status, is_repo_integrity_failure, run_validation_group
+from specctl.commands.oneshot_runtime import (
+    build_scoped_prompt,
+    finalize_run_status,
+    is_repo_integrity_failure,
+    prompt_suffix_for_runner,
+    run_validation_group,
+)
 from specctl.oneshot_utils import append_blocker, collect_run_stats, parse_blockers, parse_task_ids, scan_placeholder_markers
 from specctl.validators.oneshot import BLOCKER_ID_RE, CHECKPOINT_ID_RE
 
@@ -198,3 +204,23 @@ def test_parse_task_ids_accepts_variable_width_dotted_segments() -> None:
     ids = parse_task_ids(text)
     assert "T-F001.1-001" in ids
     assert "T-F001.010-001" in ids
+
+
+def test_prompt_suffix_for_autoresearch_uses_program_artifacts() -> None:
+    assert prompt_suffix_for_runner("autoresearch") == ".program.md"
+    assert prompt_suffix_for_runner("autoresearch", resume=True) == ".resume.program.md"
+    assert prompt_suffix_for_runner("codex") == ".prompt.md"
+
+
+def test_build_scoped_prompt_adds_autoresearch_experiment_guidance() -> None:
+    prompt = build_scoped_prompt(
+        "E-001",
+        "RUN-001",
+        {"checkpoint_id": "C-E001-001", "feature_id": "F-001", "task_ids": ["T-F001-001"]},
+        "autoresearch",
+        ["python -m specctl.cli check --root ."],
+    )
+    assert "- Runner: autoresearch" in prompt
+    assert "## Autoresearch Mode" in prompt
+    assert "measured experiment loop" in prompt
+    assert "`python -m specctl.cli check --root .`" in prompt

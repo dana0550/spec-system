@@ -39,7 +39,7 @@ Acceptance:
    - `User Journeys`
    - `Constraints`
    - `Non-Goals`
-2. Run `specctl epic create --name "<Epic>" --owner <owner> --brief <brief.md>`.
+2. Run `specctl epic create --name "<Epic>" --owner <owner> --brief <brief.md> [--runner codex|claude|autoresearch]`.
 3. Confirm epic scaffolding:
    - root feature created
    - child features generated from journeys/outcomes
@@ -57,7 +57,7 @@ Acceptance:
 
 ## 4) Epic One-Shot Execution
 
-1. Start run: `specctl oneshot run --epic-id <E-ID> [--runner codex|claude]`.
+1. Start run: `specctl oneshot run --epic-id <E-ID> [--runner codex|claude|autoresearch]`.
 2. Validate contract/run artifacts: `specctl oneshot check --epic-id <E-ID> [--run-id <RUN-ID>]`.
 3. If needed, continue run: `specctl oneshot resume --epic-id <E-ID> --run-id <RUN-ID>`.
 4. Close blockers and remove placeholders.

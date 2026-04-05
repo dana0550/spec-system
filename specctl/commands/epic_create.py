@@ -192,7 +192,7 @@ def run(args) -> int:
         "epic_id": epic_id,
         "root_feature_id": root_row.feature_id,
         "scope_feature_ids": scope_feature_ids,
-        "runner": "codex",
+        "runner": args.runner,
         "checkpoint_graph": checkpoints,
         "validation_commands": ["python -m specctl.cli lint --root ."],
         "repair_policy": {"max_retries_per_checkpoint": 2, "commands": []},

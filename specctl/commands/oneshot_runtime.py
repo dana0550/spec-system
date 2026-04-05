@@ -49,8 +49,18 @@ def process_checkpoint(
         checkpoint_event.update(config.checkpoint_event_extra)
     append_event(run_dir, checkpoint_event)
 
+    validation_commands = checkpoint.get("validation_commands", contract.get("validation_commands", []))
+    if not isinstance(validation_commands, list):
+        validation_commands = []
+
     prompt_path = run_dir / f"{checkpoint_id}{config.prompt_suffix}"
-    prompt_text = build_scoped_prompt(epic.epic_id, state["run_id"], checkpoint)
+    prompt_text = build_scoped_prompt(
+        epic.epic_id,
+        state["run_id"],
+        checkpoint,
+        str(state.get("runner", "codex")),
+        validation_commands,
+    )
     write_text(prompt_path, prompt_text)
 
     runner_command = checkpoint.get("runner_command") or contract.get("runner_command")
@@ -80,9 +90,6 @@ def process_checkpoint(
             },
         )
 
-    validation_commands = checkpoint.get("validation_commands", contract.get("validation_commands", []))
-    if not isinstance(validation_commands, list):
-        validation_commands = []
     success, failed_commands = run_validation_group(
         run_dir,
         root,
@@ -284,7 +291,19 @@ def write_summary(run_dir: Path, state: dict, blockers: list[dict[str, str]]) ->
     write_text(run_dir / "summary.md", "\n".join(lines) + "\n")
 
 
-def build_scoped_prompt(epic_id: str, run_id: str, checkpoint: dict) -> str:
+def prompt_suffix_for_runner(runner: str, resume: bool = False) -> str:
+    if runner == "autoresearch":
+        return ".resume.program.md" if resume else ".program.md"
+    return ".resume.prompt.md" if resume else ".prompt.md"
+
+
+def build_scoped_prompt(
+    epic_id: str,
+    run_id: str,
+    checkpoint: dict,
+    runner: str,
+    validation_commands: list[str],
+) -> str:
     lines = [
         "# One-Shot Checkpoint Prompt",
         "",
@@ -292,15 +311,40 @@ def build_scoped_prompt(epic_id: str, run_id: str, checkpoint: dict) -> str:
         f"- Run: {run_id}",
         f"- Checkpoint: {checkpoint.get('checkpoint_id', '')}",
         f"- Feature: {checkpoint.get('feature_id', '')}",
+        f"- Runner: {runner}",
         f"- Tasks: {', '.join(checkpoint.get('task_ids', []))}",
         "",
         "## Objective",
         f"- Complete checkpoint `{checkpoint.get('checkpoint_id', '')}` and satisfy mapped task IDs.",
         "",
-        "## Guardrails",
-        "- Preserve repository integrity.",
-        "- Keep traceability links intact.",
-        "- If blocked, emit placeholder marker and continue per blocker policy.",
-        "",
+        "## Validation",
     ]
+    if validation_commands:
+        lines.extend(f"- `{command}`" for command in validation_commands)
+    else:
+        lines.append("- No validation commands configured.")
+
+    if runner == "autoresearch":
+        lines.extend(
+            [
+                "",
+                "## Autoresearch Mode",
+                "- Treat this checkpoint as a measured experiment loop, not a single blind edit.",
+                "- Establish the current baseline before making a scoped change.",
+                "- Make one coherent improvement at a time and keep only changes that improve the measured outcome.",
+                "- Revert or discard regressions rather than compounding them into the branch.",
+                "- Record the winning outcome and the evidence needed for downstream verification.",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Guardrails",
+            "- Preserve repository integrity.",
+            "- Keep traceability links intact.",
+            "- If blocked, emit placeholder marker and continue per blocker policy.",
+            "",
+        ]
+    )
     return "\n".join(lines)

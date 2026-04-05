@@ -189,6 +189,14 @@ finalize_gates:
     - python -m specctl.cli lint --root .
 ```
 
+Supported runner values:
+
+- `codex`
+- `claude`
+- `autoresearch`
+
+`autoresearch` uses the same one-shot contract and validation gates, but emits checkpoint `*.program.md` prompt artifacts tuned for measured experiment loops. To actually execute an external harness, provide `runner_command` in `oneshot.yaml` or on individual checkpoints.
+
 ### Execute and finalize one-shot
 ```bash
 specctl oneshot run --epic-id E-001 --runner codex
@@ -277,10 +285,10 @@ specctl feature check --feature-id F-###
 specctl impact scan [--feature-id F-###] [--json]
 specctl impact refresh [--feature-id F-###] [--ack-upstream]
 
-specctl epic create --name "..." --owner <owner> --brief ./brief.md
+specctl epic create --name "..." --owner <owner> --brief ./brief.md [--runner codex|claude|autoresearch]
 specctl epic check --epic-id E-###
 
-specctl oneshot run --epic-id E-### [--runner codex|claude]
+specctl oneshot run --epic-id E-### [--runner codex|claude|autoresearch]
 specctl oneshot resume --epic-id E-### --run-id RUN-...
 specctl oneshot check --epic-id E-### [--run-id RUN-...]
 specctl oneshot finalize --epic-id E-### --run-id RUN-...

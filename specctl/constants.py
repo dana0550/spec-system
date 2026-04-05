@@ -44,6 +44,12 @@ RFC_KEYWORDS = {
 
 EARS_TRIGGERS = {"WHEN", "IF", "WHILE", "WHERE", "WHENEVER"}
 
+ONESHOT_RUNNERS = {
+    "autoresearch",
+    "claude",
+    "codex",
+}
+
 REQUIRED_DOC_FILES = {
     "MASTER_SPEC.md",
     "FEATURES.md",

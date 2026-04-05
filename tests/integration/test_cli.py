@@ -87,6 +87,71 @@ def test_feature_create_keeps_scenario_text_consistent_across_files(tmp_path: Pa
     assert f"- S-F001-001: {expected}" in ver_text
 
 
+def test_epic_create_accepts_autoresearch_runner_and_run_emits_program_prompt(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+    brief = root / "brief.md"
+    brief.write_text(
+        "\n".join(
+            [
+                "## Vision",
+                "- Improve delivery reliability.",
+                "",
+                "## Outcomes",
+                "- Reduce regressions.",
+                "",
+                "## User Journeys",
+                "- Operator checks a generated program.",
+                "",
+                "## Constraints",
+                "- Keep compatibility.",
+                "",
+                "## Non-Goals",
+                "- No billing changes.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "epic",
+                "create",
+                "--root",
+                str(root),
+                "--name",
+                "AutoresearchEpic",
+                "--owner",
+                "owner@example.com",
+                "--brief",
+                str(brief),
+                "--runner",
+                "autoresearch",
+            ]
+        )
+        == 0
+    )
+
+    epic_dir = next((root / "docs" / "epics").glob("E-001-*"))
+    payload = yaml.safe_load((epic_dir / "oneshot.yaml").read_text(encoding="utf-8"))
+    assert payload["runner"] == "autoresearch"
+    payload["validation_commands"] = ['python -c "print(\'ok\')"']
+    (epic_dir / "oneshot.yaml").write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["oneshot", "run", "--root", str(root), "--epic-id", "E-001"]) == 0
+
+    run_dir = next((epic_dir / "runs").iterdir())
+    program_prompt = next(run_dir.glob("*.program.md"))
+    prompt_text = program_prompt.read_text(encoding="utf-8")
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+
+    assert state["runner"] == "autoresearch"
+    assert "## Autoresearch Mode" in prompt_text
+    assert "measured experiment loop" in prompt_text
+
+
 def test_design_and_tasks_approvals_sync_frontmatter(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()

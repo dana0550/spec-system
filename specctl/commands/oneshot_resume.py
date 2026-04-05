@@ -7,7 +7,13 @@ from specctl.commands.oneshot_common import (
     read_run_state,
     write_run_state,
 )
-from specctl.commands.oneshot_runtime import CheckpointExecutionConfig, finalize_run_status, process_checkpoint, write_summary
+from specctl.commands.oneshot_runtime import (
+    CheckpointExecutionConfig,
+    finalize_run_status,
+    process_checkpoint,
+    prompt_suffix_for_runner,
+    write_summary,
+)
 from specctl.oneshot_utils import parse_blockers, write_memory_files
 
 
@@ -51,7 +57,7 @@ def run(args) -> int:
     if not isinstance(repair_commands, list):
         repair_commands = []
     resume_config = CheckpointExecutionConfig(
-        prompt_suffix=".resume.prompt.md",
+        prompt_suffix=prompt_suffix_for_runner(str(state.get("runner", contract.get("runner", "codex"))), resume=True),
         checkpoint_event_type="checkpoint_resume",
         checkpoint_event_extra=None,
         runner_event_type="runner_resume_invocation",
